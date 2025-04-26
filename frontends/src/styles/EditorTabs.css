@@ -1,0 +1,117 @@
+.editor-tabs {
+  display: flex;
+  background-color: var(--background-color);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.editor-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.editor-tabs::-webkit-scrollbar-track {
+  background: var(--background-color);
+}
+
+.editor-tabs::-webkit-scrollbar-thumb {
+  background-color: var(--border-color);
+  border-radius: 4px;
+}
+
+.tabs-container {
+  display: flex;
+}
+
+.tab {
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+  height: 2.5rem;
+  background-color: var(--background-color);
+  border-right: 1px solid var(--border-color);
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  transition: background-color 0.2s ease;
+}
+
+.tab:hover {
+  background-color: var(--hover-color);
+}
+
+.tab.active {
+  background-color: var(--active-color);
+  position: relative;
+}
+
+.tab.active::after {
+  content: "";
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: var(--primary-color);
+}
+
+.file-icon {
+  width: 1rem;
+  height: 1rem;
+  margin-right: 0.5rem;
+}
+
+.file-icon.js {
+  color: #f7df1e;
+}
+
+.file-icon.ts {
+  color: #3178c6;
+}
+
+.file-icon.html {
+  color: #e34c26;
+}
+
+.file-icon.css {
+  color: #264de4;
+}
+
+.file-icon.json {
+  color: #8bc34a;
+}
+
+.file-icon.py {
+  color: #3776ab;
+}
+
+.tab-name {
+  margin-right: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.tab-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.2s ease;
+}
+
+.tab-close:hover {
+  background-color: rgba(255, 85, 85, 0.2);
+  color: var(--error-color);
+  opacity: 1;
+}
+
+.tab-close svg {
+  width: 0.75rem;
+  height: 0.75rem;
+}

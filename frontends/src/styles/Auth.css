@@ -1,0 +1,150 @@
+.auth-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--background-color);
+}
+
+.auth-wrapper {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  max-width: 500px;
+  background-color: var(--background-light);
+}
+
+.auth-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.auth-form-container {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem;
+}
+
+.auth-title {
+  font-size: 2rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(90deg, #5e17eb, #342e48);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.auth-subtitle {
+  color: var(--text-muted);
+  margin-bottom: 2rem;
+}
+
+.auth-form {
+  margin-bottom: 2rem;
+}
+
+.form-actions {
+  margin-top: 1.5rem;
+}
+
+.auth-footer {
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.auth-footer a {
+  color: var(--primary-color);
+  font-weight: 500;
+}
+
+.auth-background {
+  flex: 1;
+  display: none;
+  background-color: var(--background-color);
+  position: relative;
+  overflow: hidden;
+}
+
+.auth-background-image {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.code-snippet {
+  max-width: 600px;
+  width: 100%;
+  background-color: var(--background-light);
+  border-radius: 0.5rem;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  position: relative;
+}
+
+.code-snippet::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2rem;
+  background-color: var(--background-color);
+  display: flex;
+  align-items: center;
+  padding: 0 1rem;
+}
+
+.code-snippet::after {
+  content: "";
+  position: absolute;
+  top: 0.75rem;
+  left: 1rem;
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 50%;
+  background-color: #ff5f56;
+  box-shadow: 1.25rem 0 0 #ffbd2e, 2.5rem 0 0 #27c93f;
+}
+
+.code-snippet pre {
+  margin: 0;
+  padding: 3rem 1.5rem 1.5rem;
+  font-family: "Fira Code", monospace;
+  font-size: 0.875rem;
+  line-height: 1.6;
+  overflow-x: auto;
+}
+
+.code-snippet code {
+  color: var(--text-color);
+}
+
+@media (min-width: 992px) {
+  .auth-background {
+    display: block;
+  }
+}
+
+@keyframes typing {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+@keyframes blink {
+  50% {
+    border-color: transparent;
+  }
+}
