@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useProject } from "../contexts/ProjectContext";
 import { useSocket } from "../contexts/SocketContext";
 import { useAuth } from "../contexts/AuthContext";
+import { MdOutlineHome } from "react-icons/md";
 import { useTheme } from "../contexts/ThemeContext";
 import MonacoEditor from "@monaco-editor/react";
 import FileExplorer from "../components/FileExplorer";
@@ -12,16 +13,12 @@ import AIAssistant from "../components/AIAssistant";
 import LivePreview from "../components/LivePreview";
 import Toolbar from "../components/Toolbar";
 import Collaborators from "../components/Collaborators";
-import { IoHomeOutline } from "react-icons/io5";
+import CodeRunner from "../components/CodeRunner";
+import ErrorBoundary from "../components/ErrorBoundary";
 import "../styles/Editor.css";
 
-import {
-  registerLanguages,
-  initLanguageClient,
-  configureEditor,
-} from "../services/monacoLanguageService";
-
 const Editor = () => {
+  // Get data from contexts and params
   const { projectId } = useParams();
   const {
     project,
@@ -39,7 +36,8 @@ const Editor = () => {
   const { currentUser } = useAuth();
   const { darkMode, toggleTheme } = useTheme();
 
-  const [editorLayout, setEditorLayout] = useState("default");
+  // Component state
+  const [editorLayout, setEditorLayout] = useState("default"); // default, preview, terminal, ai
   const [showFileExplorer, setShowFileExplorer] = useState(true);
   const [showTerminal, setShowTerminal] = useState(false);
   const [showAIAssistant, setShowAIAssistant] = useState(false);
@@ -48,20 +46,22 @@ const Editor = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [editorInstance, setEditorInstance] = useState(null);
   const [editorTheme, setEditorTheme] = useState(darkMode ? "vs-dark" : "vs");
-  const [languageClient, setLanguageClient] = useState(null);
-  const [monaco, setMonaco] = useState(null);
+  const [activeTerminalTab, setActiveTerminalTab] = useState("terminal"); // terminal, runner
+  const [cssLinks, setCssLinks] = useState({}); // Track CSS files linked to HTML files
 
-  const navigate = useNavigate();
+  // Refs
   const editorRef = useRef(null);
+  const monacoRef = useRef(null);
 
-  const toHome = () => {
-    navigate("/dashboard");
-  };
-
+  const tohome = () => navigate("/dashboard");
+  // Update editor theme when app theme changes
   useEffect(() => {
     setEditorTheme(darkMode ? "vs-dark" : "vs");
   }, [darkMode]);
 
+  const navigate = useNavigate();
+
+  // Handle editor layout changes
   useEffect(() => {
     if (showLivePreview && showTerminal) {
       setEditorLayout("both");
@@ -76,6 +76,7 @@ const Editor = () => {
     }
   }, [showLivePreview, showTerminal, showAIAssistant]);
 
+  // Handle socket events for code execution
   useEffect(() => {
     if (!socket) return;
 
@@ -94,10 +95,15 @@ const Editor = () => {
       setIsRunning(false);
     };
 
-    const handleExecutionDone = () => {
+    const handleExecutionDone = (data) => {
       setTerminalOutput((prev) => [
         ...prev,
-        { type: "info", content: "Execution completed" },
+        {
+          type: "info",
+          content: `Execution completed (Status: ${
+            data.status || "Done"
+          }, Time: ${data.time || "0.00"}s, Memory: ${data.memory || "0"}KB)`,
+        },
       ]);
       setIsRunning(false);
     };
@@ -113,98 +119,124 @@ const Editor = () => {
     };
   }, [socket]);
 
-  // Initialize Monaco language support
+  // Auto-link CSS files to HTML files
   useEffect(() => {
-    if (!monaco) return;
+    if (!files || !fileContent) return;
 
-    try {
-      // Only register languages if monaco is available
-      registerLanguages(monaco);
-    } catch (err) {
-      console.error("Error registering languages:", err);
-    }
-  }, [monaco]);
+    // Find HTML files
+    const htmlFiles = files.filter((file) => file.name.endsWith(".html"));
 
-  // Initialize language client when active file changes
-  useEffect(() => {
-    const initClient = async () => {
-      if (editorInstance && activeFile) {
-        try {
-          // Cleanup previous client
-          if (languageClient) {
-            try {
-              await languageClient.stop();
-            } catch (err) {
-              console.error("Error stopping previous language client:", err);
+    // Find CSS files
+    const cssFiles = files.filter((file) => file.name.endsWith(".css"));
+
+    if (htmlFiles.length > 0 && cssFiles.length > 0) {
+      const newCssLinks = { ...cssLinks };
+
+      htmlFiles.forEach((htmlFile) => {
+        const htmlContent = fileContent[htmlFile._id] || "";
+
+        // Check if HTML already has link tags for CSS files
+        cssFiles.forEach((cssFile) => {
+          const cssFileName = cssFile.name;
+          const linkExists =
+            htmlContent.includes(`href="${cssFileName}"`) ||
+            htmlContent.includes(`href='./${cssFileName}'`) ||
+            htmlContent.includes(`href="./${cssFileName}"`);
+
+          if (
+            !linkExists &&
+            !newCssLinks[htmlFile._id]?.includes(cssFile._id)
+          ) {
+            // Add CSS file to the links for this HTML file
+            if (!newCssLinks[htmlFile._id]) {
+              newCssLinks[htmlFile._id] = [];
             }
+            newCssLinks[htmlFile._id].push(cssFile._id);
           }
+        });
+      });
 
-          const language = getLanguageFromFileName(activeFile.name);
-          const client = await initLanguageClient(editorInstance, language);
-          setLanguageClient(client);
-        } catch (err) {
-          console.error("Error initializing language client:", err);
-        }
-      }
-    };
-
-    initClient();
-  }, [activeFile, editorInstance]);
-
-  const handleEditorWillMount = (monacoInstance) => {
-    // Store monaco instance for later use
-    setMonaco(monacoInstance);
-  };
-
-  const handleEditorDidMount = (editor, monacoInstance) => {
-    editorRef.current = editor;
-    setEditorInstance(editor);
-    setMonaco(monacoInstance);
-
-    try {
-      // Configure editor
-      configureEditor(editor);
-
-      // Add keyboard shortcuts
-      editor.addCommand(
-        monacoInstance.KeyMod.CtrlCmd | monacoInstance.KeyCode.KeyS,
-        () => {
-          console.log("File saved");
-          // Here you could trigger an actual save action to your backend
-          if (activeFile) {
-            // You might want to add UI feedback like a toast notification
-            console.log(`File ${activeFile.name} saved`);
-          }
-        }
-      );
-
-      // Format document shortcut
-      editor.addCommand(
-        monacoInstance.KeyMod.Alt |
-          monacoInstance.KeyMod.Shift |
-          monacoInstance.KeyCode.KeyF,
-        () => {
-          editor.getAction("editor.action.formatDocument")?.run();
-        }
-      );
-    } catch (err) {
-      console.error("Error setting up editor:", err);
+      setCssLinks(newCssLinks);
     }
+  }, [files, fileContent, activeFile]);
+
+  const handleEditorDidMount = (editor, monaco) => {
+    editorRef.current = editor;
+    monacoRef.current = monaco;
+    setEditorInstance(editor);
+
+    // Set up editor options
+    editor.updateOptions({
+      fontSize: 14,
+      fontFamily: "'Fira Code', monospace",
+      minimap: { enabled: false },
+      scrollBeyondLastLine: false,
+      automaticLayout: true,
+      tabSize: 2,
+      wordWrap: "on",
+    });
+
+    // Add keyboard shortcuts
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
+      // Save file - already handled by debounced save
+      console.log("File saved");
+    });
+
+    // Add code completion provider
+    monaco.languages.registerCompletionItemProvider("javascript", {
+      provideCompletionItems: (model, position) => {
+        const word = model.getWordUntilPosition(position);
+        const range = {
+          startLineNumber: position.lineNumber,
+          endLineNumber: position.lineNumber,
+          startColumn: word.startColumn,
+          endColumn: word.endColumn,
+        };
+
+        return {
+          suggestions: [
+            {
+              label: "console.log",
+              kind: monaco.languages.CompletionItemKind.Function,
+              insertText: "console.log($1);",
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              range: range,
+            },
+            {
+              label: "function",
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: "function ${1:name}(${2:params}) {\n\t${3}\n}",
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              range: range,
+            },
+            {
+              label: "async function",
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: "async function ${1:name}(${2:params}) {\n\t${3}\n}",
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              range: range,
+            },
+            {
+              label: "try-catch",
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText:
+                "try {\n\t${1}\n} catch (error) {\n\tconsole.error(error);\n}",
+              insertTextRules:
+                monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              range: range,
+            },
+          ],
+        };
+      },
+    });
   };
 
   const handleEditorChange = (value) => {
     if (activeFile) {
       updateFileContent(activeFile._id, value);
-
-      // If connected via socket, broadcast changes
-      if (socket && connected) {
-        socket.emit("file:update", {
-          projectId,
-          fileId: activeFile._id,
-          content: value,
-          userId: currentUser?.id,
-        });
-      }
     }
   };
 
@@ -246,6 +278,7 @@ const Editor = () => {
 
     setIsRunning(true);
     setShowTerminal(true);
+    setActiveTerminalTab("terminal");
     setTerminalOutput([{ type: "info", content: "Running code..." }]);
 
     socket.emit("execution:run", {
@@ -309,9 +342,9 @@ const Editor = () => {
     <div className="editor-container">
       <header className="editor-header">
         <div className="editor-header-left">
-          <div className="logo">
-            <span className="gradient-text" onClick={toHome}>
-              <IoHomeOutline />
+          <div className="logo" onClick={tohome}>
+            <span className="gradient-text">
+              <MdOutlineHome />
             </span>
           </div>
           <h1 className="project-name">{project?.name || "Project"}</h1>
@@ -364,16 +397,9 @@ const Editor = () => {
                   theme={editorTheme}
                   value={fileContent[activeFile._id] || ""}
                   onChange={handleEditorChange}
-                  beforeMount={handleEditorWillMount}
                   onMount={handleEditorDidMount}
                   options={{
                     readOnly: false,
-                    automaticLayout: true,
-                    scrollBeyondLastLine: false,
-                    minimap: { enabled: true },
-                    smoothScrolling: true,
-                    cursorBlinking: "smooth",
-                    cursorSmoothCaretAnimation: "on",
                   }}
                 />
               ) : (
@@ -407,11 +433,21 @@ const Editor = () => {
                   </svg>
                 </button>
               </div>
-              <LivePreview
-                projectId={projectId}
-                files={files}
-                fileContent={fileContent}
-              />
+              <ErrorBoundary
+                fallback={
+                  <div className="preview-error">
+                    <p>Preview failed to load due to a technical error.</p>
+                    <p>Try running your code instead.</p>
+                  </div>
+                }
+              >
+                <LivePreview
+                  projectId={projectId}
+                  files={files}
+                  fileContent={fileContent}
+                  cssLinks={cssLinks}
+                />
+              </ErrorBoundary>
             </div>
           )}
           {showTerminal && (
@@ -464,10 +500,43 @@ const Editor = () => {
                   </button>
                 </div>
               </div>
-              <Terminal output={terminalOutput} />
+              <div className="terminal-tabs">
+                <button
+                  className={`terminal-tab ${
+                    activeTerminalTab === "terminal" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTerminalTab("terminal")}
+                >
+                  Terminal
+                </button>
+                <button
+                  className={`terminal-tab ${
+                    activeTerminalTab === "runner" ? "active" : ""
+                  }`}
+                  onClick={() => setActiveTerminalTab("runner")}
+                >
+                  Code Runner
+                </button>
+              </div>
+              <div className="terminal-content">
+                {activeTerminalTab === "terminal" ? (
+                  <Terminal
+                    projectId={projectId}
+                    activeFile={activeFile}
+                    fileContent={fileContent}
+                    socket={socket}
+                    output={terminalOutput}
+                  />
+                ) : (
+                  <CodeRunner
+                    socket={socket}
+                    activeFile={activeFile}
+                    fileContent={fileContent}
+                  />
+                )}
+              </div>
             </div>
           )}
-
           {showAIAssistant && (
             <div className="ai-container">
               <div className="panel-header">

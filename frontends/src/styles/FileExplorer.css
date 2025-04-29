@@ -51,6 +51,47 @@
   height: 1rem;
 }
 
+.file-explorer-search {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  position: relative;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem;
+  padding-right: 2rem;
+  border-radius: 0.25rem;
+  border: 1px solid var(--border-color);
+  background-color: var(--background-light);
+  color: var(--text-color);
+  font-size: 0.875rem;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary-color);
+}
+
+.clear-search {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.clear-search svg {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
 .file-explorer-content {
   flex: 1;
   overflow-y: auto;
@@ -59,6 +100,8 @@
 
 .file-list {
   list-style: none;
+  margin: 0;
+  padding: 0;
 }
 
 .file-list.nested {
@@ -67,6 +110,11 @@
 
 .file-item {
   position: relative;
+}
+
+.file-item.drop-target > .file-item-content {
+  background-color: var(--primary-color-light);
+  outline: 1px dashed var(--primary-color);
 }
 
 .file-item-content {
@@ -181,6 +229,11 @@
   background-color: var(--hover-color);
 }
 
+.context-menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .context-menu-item svg {
   width: 1rem;
   height: 1rem;
@@ -195,4 +248,224 @@
   height: 1px;
   background-color: var(--border-color);
   margin: 0.25rem 0;
+}
+
+/* Drag and drop styles */
+.file-item[draggable="true"] {
+  cursor: move;
+}
+
+.file-item.dragging {
+  opacity: 0.5;
+}
+
+.file-item.drop-target > .file-item-content {
+  background-color: rgba(var(--primary-color-rgb), 0.2);
+  outline: 1px dashed var(--primary-color);
+}
+
+/* Clipboard indicator */
+.file-item.cut > .file-item-content {
+  opacity: 0.6;
+}
+
+/* File type icons */
+.file-icon.html svg {
+  color: #e44d26;
+}
+.file-icon.css svg {
+  color: #264de4;
+}
+.file-icon.js svg {
+  color: #f7df1e;
+}
+.file-icon.jsx svg {
+  color: #61dafb;
+}
+.file-icon.ts svg {
+  color: #007acc;
+}
+.file-icon.tsx svg {
+  color: #007acc;
+}
+.file-icon.json svg {
+  color: #5b5b5b;
+}
+.file-icon.md svg {
+  color: #57a143;
+}
+.file-icon.py svg {
+  color: #3572a5;
+}
+.file-icon.java svg {
+  color: #b07219;
+}
+
+/* Expanded folder animation */
+.folder-icon.open svg {
+  transform: rotate(0);
+  transition: transform 0.2s ease;
+}
+
+.folder-icon:not(.open) svg {
+  transform: rotate(-90deg);
+  transition: transform 0.2s ease;
+}
+
+/* Nested file list animation */
+.file-list.nested {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease;
+}
+
+.file-item.folder.expanded > .file-list.nested {
+  max-height: 1000px;
+}
+
+/* Search highlight */
+.file-name .highlight {
+  background-color: rgba(var(--primary-color-rgb), 0.3);
+  border-radius: 2px;
+}
+
+/* Empty state */
+.empty-explorer {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--text-muted);
+  text-align: center;
+  padding: 2rem;
+}
+
+.empty-explorer svg {
+  width: 3rem;
+  height: 3rem;
+  margin-bottom: 1rem;
+  opacity: 0.5;
+}
+
+.empty-explorer p {
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.empty-explorer button {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 0.25rem;
+  padding: 0.5rem 1rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.empty-explorer button:hover {
+  background-color: var(--primary-color-dark);
+}
+
+/* File explorer toolbar */
+.file-explorer-toolbar {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  gap: 0.25rem;
+}
+
+.file-explorer-toolbar button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.25rem;
+  background: transparent;
+  border: none;
+  color: var(--text-color);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.file-explorer-toolbar button:hover {
+  background-color: var(--hover-color);
+}
+
+.file-explorer-toolbar button svg {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* Breadcrumb navigation */
+.file-explorer-breadcrumb {
+  display: flex;
+  align-items: center;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.breadcrumb-item {
+  display: flex;
+  align-items: center;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.breadcrumb-item:hover {
+  color: var(--text-color);
+}
+
+.breadcrumb-separator {
+  margin: 0 0.25rem;
+  color: var(--text-muted);
+}
+
+/* File status indicators */
+.file-status {
+  display: flex;
+  align-items: center;
+  margin-left: auto;
+}
+
+.file-status-indicator {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  margin-left: 0.25rem;
+}
+
+.file-status-modified {
+  background-color: var(--warning-color);
+}
+
+.file-status-new {
+  background-color: var(--success-color);
+}
+
+.file-status-deleted {
+  background-color: var(--error-color);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .file-explorer {
+    min-width: 200px;
+  }
+}
+
+@media (max-width: 480px) {
+  .file-explorer-header h2 {
+    display: none;
+  }
+
+  .file-explorer {
+    min-width: 150px;
+  }
 }

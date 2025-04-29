@@ -6,34 +6,42 @@ const socketIo = require("socket.io");
 const dotenv = require("dotenv");
 const path = require("path");
 
+// Load environment variables
 dotenv.config();
 
-const authRoutes = require("./routes/auth.routes");
-const projectRoutes = require("./routes/project.routes");
-const aiRoutes = require("./routes/ai.routes");
-const ratingsRoutes = require("./routes/ratings.routes");
-const friendsRoutes = require("./routes/friends.routes"); // Added missing import
-
-const socketHandler = require("./socket");
-
+// Create Express app
 const app = express();
 const server = http.createServer(app);
+
+// Configure CORS options
+const corsOptions = {
+  origin: process.env.CLIENT_URL || "http://localhost:3000",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  credentials: true,
+  allowedHeaders: ["Content-Type", "Authorization"],
+};
+
+// Configure Socket.IO with CORS
 const io = socketIo(server, {
-  cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    methods: ["GET", "POST"],
-    credentials: true,
-  },
+  cors: corsOptions,
+  pingTimeout: 60000,
+  pingInterval: 25000,
 });
 
-app.use(
-  cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
-    credentials: true,
-  })
-);
-app.use(express.json());
+// Middleware
+app.use(cors(corsOptions));
+app.use(express.json({ limit: "50mb" }));
+app.use(express.urlencoded({ extended: true, limit: "50mb" }));
 
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res
+    .status(500)
+    .json({ success: false, message: "Server error", error: err.message });
+});
+
+// Connect to MongoDB
 mongoose
   .connect(process.env.MONGODB_URI || "mongodb://localhost:27017/dev-cobb", {
     useNewUrlParser: true,
@@ -42,78 +50,49 @@ mongoose
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("MongoDB connection error:", err));
 
+// Import routes
+const authRoutes = require("./routes/auth.routes");
+const projectRoutes = require("./routes/project.routes");
+const aiRoutes = require("./routes/ai.routes");
+const ratingsRoutes = require("./routes/ratings.routes");
+const friendRoutes = require("./routes/friends.routes");
+
+// Import socket handler
+const socketHandler = require("./socket");
+
+// API routes
 app.use("/api/auth", authRoutes);
 app.use("/api/projects", projectRoutes);
-app.use("/api/projects", ratingsRoutes);
+app.use("/api/rates", ratingsRoutes); // Add ratings routes
 app.use("/api/ai", aiRoutes);
-app.use("/api/friends", friendsRoutes); // Added friends routes
+app.use("/api/friends", friendRoutes);
 
+// Health check endpoint
+app.get("/api/health", (req, res) => {
+  res.status(200).json({ status: "ok", message: "Server is running" });
+});
+
+// Socket.io setup
 socketHandler(io);
 
-// User routes
-app.get("/api/users/:userId", async (req, res) => {
-  try {
-    const user = await require("./models/User")
-      .findById(req.params.userId)
-      .select("name email username avatar bio website location friends");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      user,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
-// Endpoint to get user's friends
-app.get("/api/users/:userId/friends", async (req, res) => {
-  try {
-    const user = await require("./models/User")
-      .findById(req.params.userId)
-      .populate("friends", "name email username avatar");
-
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: "User not found",
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      count: user.friends.length,
-      friends: user.friends,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
-  }
-});
-
+// Serve static assets in production
 if (process.env.NODE_ENV === "production") {
   app.use(express.static(path.join(__dirname, "../frontend/build")));
 
+  // Handle React routing, return all requests to React app
   app.get("*", (req, res) => {
     res.sendFile(path.join(__dirname, "../frontend/build", "index.html"));
   });
 }
 
-const PORT = process.env.PORT || 5001;
+// Start server
+const PORT = process.env.PORT || 5000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
+});
+
+// Handle unhandled promise rejections
+process.on("unhandledRejection", (err) => {
+  console.error("Unhandled Promise Rejection:", err);
+  // Don't crash the server, just log the error
 });

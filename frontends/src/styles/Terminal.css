@@ -1,124 +1,112 @@
 .terminal {
+  display: flex;
+  flex-direction: column;
   height: 100%;
-  background-color: var(--background-color);
+  background-color: var(--terminal-bg, #1e1e1e);
+  color: var(--terminal-text, #f0f0f0);
   font-family: "Fira Code", monospace;
-  font-size: 0.875rem;
+  font-size: 14px;
+  line-height: 1.5;
   overflow-y: auto;
   padding: 0.5rem;
-  display: flex;
-  flex-direction: column;
 }
 
-.terminal-content {
-  display: flex;
-  flex-direction: column;
+.terminal-output {
   flex: 1;
-  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .terminal-welcome {
-  color: var(--text-muted);
-  padding: 0.5rem;
-  text-align: center;
+  color: var(--terminal-welcome, #6a9955);
+  margin-bottom: 1rem;
 }
 
 .terminal-line {
-  display: flex;
-  padding: 0.25rem 0;
-  line-height: 1.5;
-  animation: fadeIn 0.2s ease;
-  white-space: pre-wrap;
-  word-break: break-word;
+  margin-bottom: 0.25rem;
 }
 
-.terminal-prefix {
-  display: inline-block;
-  padding: 0 0.5rem;
-  margin-right: 0.5rem;
-  font-weight: 600;
-  font-size: 0.75rem;
-  border-radius: 0.25rem;
+.terminal-line.command {
+  color: var(--terminal-command, #569cd6);
 }
 
-.terminal-prefix.info {
-  background-color: var(--info-color);
-  color: var(--background-color);
+.terminal-line.output {
+  color: var(--terminal-output, #d4d4d4);
 }
 
-.terminal-prefix.error {
-  background-color: var(--error-color);
-  color: white;
+.terminal-line.error {
+  color: var(--terminal-error, #f14c4c);
 }
 
-.terminal-prefix.output {
-  background-color: var(--success-color);
-  color: var(--background-color);
-}
-
-.terminal-text {
-  flex: 1;
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.terminal-line.error .terminal-text {
-  color: var(--error-color);
-}
-
-.terminal-line.command .terminal-text {
-  color: var(--text-color);
-  font-weight: 500;
-}
-
-.terminal-input-form {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem 0;
-  border-top: 1px solid var(--border-color);
-  margin-top: auto;
+.terminal-line.info {
+  color: var(--terminal-info, #3794ff);
 }
 
 .terminal-prompt {
-  color: var(--primary-color);
-  font-weight: bold;
+  color: var(--terminal-prompt, #dcdcaa);
   margin-right: 0.5rem;
+}
+
+.terminal-input-line {
+  display: flex;
+  align-items: center;
+  margin-top: 0.5rem;
 }
 
 .terminal-input {
   flex: 1;
   background: transparent;
   border: none;
-  color: var(--text-color);
-  font-family: "Fira Code", monospace;
-  font-size: 0.875rem;
+  color: var(--terminal-input, #f0f0f0);
+  font-family: inherit;
+  font-size: inherit;
+  padding: 0;
+  margin: 0;
   outline: none;
 }
 
-.terminal-input:disabled {
-  opacity: 0.7;
-  cursor: not-allowed;
+.terminal-code {
+  background-color: rgba(0, 0, 0, 0.2);
+  padding: 0.5rem;
+  border-radius: 0.25rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
 }
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-  }
-  to {
-    opacity: 1;
-  }
+/* Scrollbar styles */
+.terminal::-webkit-scrollbar {
+  width: 8px;
 }
 
-.terminal-input::after {
-  content: "|";
+.terminal::-webkit-scrollbar-track {
+  background: var(--terminal-scrollbar-track, #1e1e1e);
+}
+
+.terminal::-webkit-scrollbar-thumb {
+  background: var(--terminal-scrollbar-thumb, #555);
+  border-radius: 4px;
+}
+
+.terminal::-webkit-scrollbar-thumb:hover {
+  background: var(--terminal-scrollbar-thumb-hover, #777);
+}
+
+/* Blinking cursor */
+.terminal-cursor {
+  display: inline-block;
+  width: 8px;
+  height: 16px;
+  background-color: var(--terminal-cursor, #f0f0f0);
   animation: blink 1s step-end infinite;
+  vertical-align: middle;
 }
 
 @keyframes blink {
-  from,
-  to {
-    opacity: 0;
+  0%,
+  100% {
+    opacity: 1;
   }
   50% {
-    opacity: 1;
+    opacity: 0;
   }
 }

@@ -1,113 +1,107 @@
-import { createContext, useContext, useEffect, useState } from "react"
-import { useParams } from "react-router-dom"
-import { io } from "socket.io-client"
-import { useAuth } from "./AuthContext"
+"use client";
 
-const SocketContext = createContext()
+import {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+} from "react";
+import { useAuth } from "./AuthContext";
+import io from "socket.io-client";
 
-export const useSocket = () => useContext(SocketContext)
+const SocketContext = createContext();
 
-// Helper function to debug socket connection events
-const debugSocketConnection = (socket) => {
-  const events = [
-    'connect', 'connect_error', 'disconnect', 'error', 
-    'reconnect', 'reconnect_attempt', 'reconnect_failed'
-  ];
-  
-  events.forEach(event => {
-    socket.on(event, (...args) => {
-      console.log(`Socket event [${event}]:`, args);
-    });
-  });
-};
+export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
-  const [socket, setSocket] = useState(null)
-  const [connected, setConnected] = useState(false)
-  const [collaborators, setCollaborators] = useState([])
-  const { projectId } = useParams()
-  const { currentUser } = useAuth()
+  const { token } = useAuth();
+  const [socket, setSocket] = useState(null);
+  const [connected, setConnected] = useState(false);
+  const [collaborators, setCollaborators] = useState([]);
+  const [reconnectAttempts, setReconnectAttempts] = useState(0);
+  const maxReconnectAttempts = 5;
 
+  // Initialize socket connection
   useEffect(() => {
-    if (!currentUser || !projectId) return
+    if (!token) return;
 
-    // Close any existing connection first
-    if (socket) {
-      console.log("Closing existing socket connection");
-      socket.disconnect();
-    }
-
-    const token = localStorage.getItem("token")
-    const socketUrl = process.env.REACT_APP_API_URL || "http://localhost:5001";
-    
-    console.log("Initializing new socket connection");
-    const newSocket = io(socketUrl, {
-      path: "/socket.io",  // Explicitly set the path
-      auth: { token },
-      query: { projectId },
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 20000,  // Increase connection timeout
-      transports: ['websocket', 'polling'],  // Try both transports
-      forceNew: true,
-      extraHeaders: {
-        "User-Agent": navigator.userAgent
+    const socketInstance = io(
+      process.env.REACT_APP_API_URL || "http://localhost:5001",
+      {
+        auth: { token },
+        reconnection: true,
+        reconnectionAttempts: maxReconnectAttempts,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 5000,
+        timeout: 20000,
       }
-    })
+    );
 
-    // Add debug logging for all socket events
-    debugSocketConnection(newSocket);
-
-    newSocket.on("connect", () => {
-      console.log(`Socket connected successfully. ID: ${newSocket.id}`);
+    socketInstance.on("connect", () => {
+      console.log("Socket connected");
       setConnected(true);
-      
-      // Join the project room after successful connection
-      newSocket.emit("project:join", { projectId });
-    })
+      setReconnectAttempts(0);
+    });
 
-    newSocket.on("disconnect", (reason) => {
-      console.log(`Socket disconnected. Reason: ${reason}`);
+    socketInstance.on("disconnect", (reason) => {
+      console.log("Socket disconnected:", reason);
       setConnected(false);
-    })
+    });
 
-    newSocket.on("collaborators", (users) => {
-      console.log("Received collaborators update:", users);
-      setCollaborators(users);
-    })
+    socketInstance.on("connect_error", (error) => {
+      console.error("Socket connection error:", error);
+      setReconnectAttempts((prev) => prev + 1);
+    });
 
-    newSocket.on("connect_error", (err) => {
-      console.error("Socket connection error:", err.message || err);
-      console.error("Connection details:", {
-        url: socketUrl,
-        projectId,
-        hasToken: !!token
+    socketInstance.on("error", (error) => {
+      console.error("Socket error:", error);
+    });
+
+    socketInstance.on("collaborators", (data) => {
+      setCollaborators(data);
+    });
+
+    socketInstance.on("user:joined", (user) => {
+      setCollaborators((prev) => {
+        if (prev.some((u) => u.id === user.id)) {
+          return prev;
+        }
+        return [...prev, user];
       });
-      setConnected(false);
-    })
+    });
 
-    // Add error handling for socket errors
-    newSocket.on("error", (err) => {
-      console.error("Socket error:", err);
-    })
+    socketInstance.on("user:left", (data) => {
+      setCollaborators((prev) => prev.filter((user) => user.id !== data.id));
+    });
 
-    setSocket(newSocket)
+    setSocket(socketInstance);
 
     return () => {
-      console.log("Cleaning up socket connection");
-      if (newSocket) {
-        newSocket.disconnect();
-      }
+      socketInstance.disconnect();
+    };
+  }, [token]);
+
+  // Handle reconnection attempts
+  useEffect(() => {
+    if (reconnectAttempts >= maxReconnectAttempts) {
+      console.error("Max reconnection attempts reached");
+      // You could show a notification to the user here
     }
-  }, [currentUser, projectId]) // Removed socket from dependency array to fix infinite loop
+  }, [reconnectAttempts]);
 
-  const value = {
-    socket,
-    connected,
-    collaborators,
-  }
+  // Provide a way to manually reconnect
+  const reconnect = useCallback(() => {
+    if (socket) {
+      socket.connect();
+    }
+  }, [socket]);
 
-  return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>
-}
+  return (
+    <SocketContext.Provider
+      value={{ socket, connected, collaborators, reconnect }}
+    >
+      {children}
+    </SocketContext.Provider>
+  );
+};

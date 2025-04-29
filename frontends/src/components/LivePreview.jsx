@@ -1,110 +1,158 @@
-import { useState, useEffect } from "react"
-import "../styles/LivePreview.css"
+import { useState, useEffect, useRef } from "react";
+import "../styles/LivePreview.css";
 
-const LivePreview = ({ projectId, files, fileContent }) => {
-  const [html, setHtml] = useState("")
-  const [refreshKey, setRefreshKey] = useState(0)
+const LivePreview = ({ projectId, files, fileContent, cssLinks = {} }) => {
+  const [activeHtmlFile, setActiveHtmlFile] = useState(null);
+  const iframeRef = useRef(null);
+  const [error, setError] = useState(null);
 
+  // Find HTML files
   useEffect(() => {
-    // Find HTML, CSS, and JS files
-    const htmlFile = files.find((f) => f.name.endsWith(".html"))
-    const cssFiles = files.filter((f) => f.name.endsWith(".css"))
-    const jsFiles = files.filter((f) => f.name.endsWith(".js") && !f.name.endsWith(".test.js"))
+    if (!files || files.length === 0) return;
 
-    if (htmlFile && fileContent[htmlFile._id]) {
-      let htmlContent = fileContent[htmlFile._id]
+    // Find the first HTML file
+    const htmlFiles = files.filter((file) => file.name.endsWith(".html"));
+    if (htmlFiles.length > 0 && !activeHtmlFile) {
+      setActiveHtmlFile(htmlFiles[0]);
+    }
+  }, [files, activeHtmlFile]);
 
-      // Inject CSS
-      let cssContent = ""
+  // Update preview when file content changes
+  useEffect(() => {
+    try {
+      if (!activeHtmlFile || !fileContent[activeHtmlFile._id]) return;
+      setError(null);
+
+      let htmlContent = fileContent[activeHtmlFile._id];
+
+      // Find all CSS files
+      const cssFiles = files.filter((file) => file.name.endsWith(".css"));
+
+      // Collect all CSS content
+      let allCssContent = "";
       cssFiles.forEach((cssFile) => {
         if (fileContent[cssFile._id]) {
-          cssContent += fileContent[cssFile._id]
+          allCssContent += fileContent[cssFile._id] + "\n";
         }
-      })
+      });
 
-      if (cssContent) {
-        htmlContent = htmlContent.replace("</head>", `<style>${cssContent}</style></head>`)
+      // Inject CSS directly into HTML
+      if (allCssContent) {
+        // Check if HTML has a head tag
+        if (!htmlContent.includes("<head>")) {
+          // Add head tag if it doesn't exist
+          htmlContent = htmlContent.replace(
+            /<html[^>]*>/i,
+            "$&\n<head>\n</head>"
+          );
+        }
+
+        // Check if there's already a style tag in the head
+        if (!htmlContent.includes("<style>")) {
+          // Add style tag with CSS content
+          htmlContent = htmlContent.replace(
+            "</head>",
+            `  <style>\n${allCssContent}\n  </style>\n</head>`
+          );
+        }
       }
 
-      // Inject JS
-      let jsContent = ""
+      // Inject JS content
+      const jsFiles = files.filter(
+        (file) => file.name.endsWith(".js") && !file.name.endsWith(".test.js")
+      );
+      let jsContent = "";
       jsFiles.forEach((jsFile) => {
         if (fileContent[jsFile._id]) {
-          jsContent += fileContent[jsFile._id]
+          jsContent += fileContent[jsFile._id] + "\n";
         }
-      })
+      });
 
       if (jsContent) {
-        htmlContent = htmlContent.replace("</body>", `<script>${jsContent}</script></body>`)
+        // Check if there's already a script tag at the end of body
+        if (
+          !htmlContent.includes("<script>") &&
+          htmlContent.includes("</body>")
+        ) {
+          htmlContent = htmlContent.replace(
+            "</body>",
+            `  <script>\n${jsContent}\n  </script>\n</body>`
+          );
+        }
       }
 
-      setHtml(htmlContent)
-    } else {
-      // If no HTML file is found, create a basic preview with available CSS and JS
-      const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <meta charset="UTF-8">
-          <meta name="viewport" content="width=device-width, initial-scale=1.0">
-          <title>Preview</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; }
-            .preview-message { text-align: center; margin-top: 40px; color: #666; }
-            ${cssFiles.map((cssFile) => fileContent[cssFile._id] || "").join("\n")}
-          </style>
-        </head>
-        <body>
-          <div class="preview-message">
-            <h2>Live Preview</h2>
-            <p>Create an HTML file to see a full preview</p>
-          </div>
-          <script>
-            ${jsFiles.map((jsFile) => fileContent[jsFile._id] || "").join("\n")}
-          </script>
-        </body>
-        </html>
-      `
-
-      setHtml(htmlContent)
+      // Set the iframe content safely
+      if (iframeRef.current) {
+        try {
+          const iframe = iframeRef.current;
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          doc.open();
+          doc.write(htmlContent);
+          doc.close();
+        } catch (err) {
+          console.error("Error updating iframe content:", err);
+          setError(
+            "Failed to update preview due to security restrictions. Try running your code instead."
+          );
+        }
+      }
+    } catch (err) {
+      console.error("Error in LivePreview:", err);
+      setError(`Preview error: ${err.message}`);
     }
-  }, [files, fileContent, refreshKey])
+  }, [activeHtmlFile, fileContent, files, cssLinks]);
 
-  const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1)
-  }
+  // Handle file selection
+  const handleFileSelect = (file) => {
+    if (file.name.endsWith(".html")) {
+      setActiveHtmlFile(file);
+    }
+  };
 
   return (
     <div className="live-preview">
-      <div className="preview-toolbar">
-        <button className="preview-action" onClick={handleRefresh} title="Refresh preview">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          >
-            <path d="M23 4v6h-6"></path>
-            <path d="M1 20v-6h6"></path>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10"></path>
-            <path d="M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
-          </svg>
-        </button>
-      </div>
-      <div className="preview-frame-container">
-        <iframe
-          title="Live Preview"
-          className="preview-frame"
-          srcDoc={html}
-          sandbox="allow-scripts allow-modals"
-          key={refreshKey}
-        ></iframe>
-      </div>
+      {files && files.some((file) => file.name.endsWith(".html")) ? (
+        <>
+          <div className="preview-tabs">
+            {files
+              .filter((file) => file.name.endsWith(".html"))
+              .map((file) => (
+                <button
+                  key={file._id}
+                  className={`preview-tab ${
+                    activeHtmlFile && activeHtmlFile._id === file._id
+                      ? "active"
+                      : ""
+                  }`}
+                  onClick={() => handleFileSelect(file)}
+                >
+                  {file.name}
+                </button>
+              ))}
+          </div>
+          <div className="preview-iframe-container">
+            {error ? (
+              <div className="preview-error">
+                <p>{error}</p>
+              </div>
+            ) : (
+              <iframe
+                ref={iframeRef}
+                title="Live Preview"
+                className="preview-iframe"
+                sandbox="allow-scripts allow-same-origin"
+              ></iframe>
+            )}
+          </div>
+        </>
+      ) : (
+        <div className="no-preview">
+          <p>No HTML files found</p>
+          <p>Create an HTML file to see a live preview</p>
+        </div>
+      )}
     </div>
-  )
-}
+  );
+};
 
-export default LivePreview
+export default LivePreview;

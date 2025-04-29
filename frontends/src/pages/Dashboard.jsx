@@ -20,12 +20,17 @@ const Dashboard = () => {
   const [newProjectDescription, setNewProjectDescription] = useState("");
   const [newProjectTemplate, setNewProjectTemplate] = useState("blank");
   const [creatingProject, setCreatingProject] = useState(false);
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     const fetchProjects = async () => {
       try {
         const response = await api.get("/projects");
-        setProjects(response.data.projects);
+        if (response.data.success) {
+          setProjects(response.data.projects || []);
+        } else {
+          throw new Error(response.data.message || "Failed to fetch projects");
+        }
       } catch (err) {
         console.error("Error fetching projects:", err);
         setError("Failed to load projects. Please try again.");
@@ -64,71 +69,164 @@ const Dashboard = () => {
         template: newProjectTemplate,
       });
 
-      setProjects([...projects, response.data.project]);
-      setShowNewProjectModal(false);
-      setNewProjectName("");
-      setNewProjectDescription("");
-      setNewProjectTemplate("blank");
+      if (response.data.success) {
+        const newProject = response.data.project;
+        setProjects([...projects, newProject]);
+        setShowNewProjectModal(false);
+        setNewProjectName("");
+        setNewProjectDescription("");
+        setNewProjectTemplate("blank");
 
-      toast.success(
-        `Project "${response.data.project.name}" created successfully!`
-      );
-
-      navigate(`/editor/${response.data.project._id}`);
+        toast.success(`Project "${newProject.name}" created successfully!`);
+        navigate(`/editor/${newProject._id}`);
+      } else {
+        throw new Error(response.data.message || "Failed to create project");
+      }
     } catch (err) {
       console.error("Error creating project:", err);
-      setError("Failed to create project. Please try again.");
-      toast.error("Failed to create project. Please try again.");
+      toast.error(
+        err.response?.data?.message ||
+          "Failed to create project. Please try again."
+      );
     } finally {
       setCreatingProject(false);
     }
   };
 
-  const handleDeleteProject = async (projectId) => {
+  const handleDeleteProject = async (projectId, projectName) => {
     if (
       !window.confirm(
-        "Are you sure you want to delete this project? This action cannot be undone."
+        `Are you sure you want to delete "${projectName}"? This action cannot be undone.`
       )
     ) {
       return;
     }
 
     try {
-      await api.delete(`/projects/${projectId}`);
-      setProjects(projects.filter((p) => p._id !== projectId));
-      toast.success("Project deleted successfully");
+      const response = await api.delete(`/projects/${projectId}`);
+
+      if (response.data.success) {
+        setProjects(projects.filter((p) => p._id !== projectId));
+        toast.success("Project deleted successfully");
+      } else {
+        throw new Error(response.data.message || "Failed to delete project");
+      }
     } catch (err) {
       console.error("Error deleting project:", err);
-      setError("Failed to delete project. Please try again.");
       toast.error("Failed to delete project. Please try again.");
     }
   };
+
+  const filteredProjects = searchTerm
+    ? projects.filter(
+        (project) =>
+          project.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          (project.description &&
+            project.description
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase()))
+      )
+    : projects;
 
   const projectTemplates = [
     {
       id: "blank",
       name: "Blank Project",
       description: "Start with an empty project",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
+          <polyline points="13 2 13 9 20 9"></polyline>
+        </svg>
+      ),
     },
     {
       id: "html-css-js",
       name: "HTML/CSS/JS",
       description: "Basic web project with HTML, CSS, and JavaScript",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <polyline points="16 18 22 12 16 6"></polyline>
+          <polyline points="8 6 2 12 8 18"></polyline>
+        </svg>
+      ),
     },
     {
       id: "react",
       name: "React",
       description: "React project with a basic component structure",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <circle cx="12" cy="12" r="10"></circle>
+          <circle cx="12" cy="12" r="4"></circle>
+          <line x1="4.93" y1="4.93" x2="9.17" y2="9.17"></line>
+          <line x1="14.83" y1="14.83" x2="19.07" y2="19.07"></line>
+          <line x1="14.83" y1="9.17" x2="19.07" y2="4.93"></line>
+          <line x1="4.93" y1="19.07" x2="9.17" y2="14.83"></line>
+        </svg>
+      ),
     },
     {
       id: "node-express",
       name: "Node.js/Express",
       description: "Backend API with Node.js and Express",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M18 10h-4v4h4v-4z"></path>
+          <path d="M10 10H6v4h4v-4z"></path>
+          <path d="M2 20h20V4H2v16z"></path>
+        </svg>
+      ),
     },
     {
       id: "python",
       name: "Python",
       description: "Python project with a main script",
+      icon: (
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
+          <path d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0"></path>
+        </svg>
+      ),
     },
   ];
 
@@ -235,6 +333,34 @@ const Dashboard = () => {
         {error && <div className="alert alert-error">{error}</div>}
 
         <div className="dashboard-actions">
+          <div className="search-container">
+            <input
+              type="text"
+              placeholder="Search projects..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="search-input"
+            />
+            {searchTerm && (
+              <button
+                className="clear-search"
+                onClick={() => setSearchTerm("")}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <line x1="18" y1="6" x2="6" y2="18"></line>
+                  <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+              </button>
+            )}
+          </div>
           <button
             className="btn btn-primary create-project-btn"
             onClick={() => setShowNewProjectModal(true)}
@@ -263,7 +389,7 @@ const Dashboard = () => {
               <div className="spinner"></div>
               <p>Loading your projects...</p>
             </div>
-          ) : projects.length === 0 ? (
+          ) : filteredProjects.length === 0 ? (
             <div className="no-projects">
               <div className="no-projects-icon">
                 <svg
@@ -278,28 +404,38 @@ const Dashboard = () => {
                   <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
                 </svg>
               </div>
-              <h3>No projects yet</h3>
-              <p>Create your first project to get started</p>
-              <button
-                className="btn btn-primary"
-                onClick={() => {
-                  setShowNewProjectModal(true);
-                  toast.info("Let's create your first project!");
-                }}
-              >
-                Create Project
-              </button>
+              <h3>
+                {searchTerm ? "No matching projects found" : "No projects yet"}
+              </h3>
+              <p>
+                {searchTerm
+                  ? "Try a different search term"
+                  : "Create your first project to get started"}
+              </p>
+              {!searchTerm && (
+                <button
+                  className="btn btn-primary"
+                  onClick={() => {
+                    setShowNewProjectModal(true);
+                    toast.info("Let's create your first project!");
+                  }}
+                >
+                  Create Project
+                </button>
+              )}
             </div>
           ) : (
             <div className="projects-grid">
-              {projects.map((project) => (
+              {filteredProjects.map((project) => (
                 <div className="project-card" key={project._id}>
                   <div className="project-card-header">
                     <h3 className="project-title">{project.name}</h3>
                     <div className="project-actions">
                       <button
                         className="project-action-btn"
-                        onClick={() => handleDeleteProject(project._id)}
+                        onClick={() =>
+                          handleDeleteProject(project._id, project.name)
+                        }
                         aria-label="Delete project"
                       >
                         <svg
@@ -445,108 +581,7 @@ const Dashboard = () => {
                           toast.info(`Selected template: ${template.name}`);
                         }}
                       >
-                        <div className="template-icon">
-                          {template.id === "blank" && (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"></path>
-                              <polyline points="13 2 13 9 20 9"></polyline>
-                            </svg>
-                          )}
-                          {template.id === "html-css-js" && (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <polyline points="16 18 22 12 16 6"></polyline>
-                              <polyline points="8 6 2 12 8 18"></polyline>
-                            </svg>
-                          )}
-                          {template.id === "react" && (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <circle cx="12" cy="12" r="10"></circle>
-                              <circle cx="12" cy="12" r="4"></circle>
-                              <line
-                                x1="4.93"
-                                y1="4.93"
-                                x2="9.17"
-                                y2="9.17"
-                              ></line>
-                              <line
-                                x1="14.83"
-                                y1="14.83"
-                                x2="19.07"
-                                y2="19.07"
-                              ></line>
-                              <line
-                                x1="14.83"
-                                y1="9.17"
-                                x2="19.07"
-                                y2="4.93"
-                              ></line>
-                              <line
-                                x1="14.83"
-                                y1="9.17"
-                                x2="18.36"
-                                y2="5.64"
-                              ></line>
-                              <line
-                                x1="4.93"
-                                y1="19.07"
-                                x2="9.17"
-                                y2="14.83"
-                              ></line>
-                            </svg>
-                          )}
-                          {template.id === "node-express" && (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M18 10h-4v4h4v-4z"></path>
-                              <path d="M10 10H6v4h4v-4z"></path>
-                              <path d="M2 20h20V4H2v16z"></path>
-                            </svg>
-                          )}
-                          {template.id === "python" && (
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              strokeWidth="2"
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                            >
-                              <path d="M14.25 6.087c0-.355.186-.676.401-.959.221-.29.349-.634.349-1.003 0-1.036-1.007-1.875-2.25-1.875s-2.25.84-2.25 1.875c0 .369.128.713.349 1.003.215.283.401.604.401.959v0"></path>
-                            </svg>
-                          )}
-                        </div>
+                        <div className="template-icon">{template.icon}</div>
                         <div className="template-info">
                           <h4>{template.name}</h4>
                           <p>{template.description}</p>
@@ -569,7 +604,14 @@ const Dashboard = () => {
                     className="btn btn-primary"
                     disabled={creatingProject || !newProjectName.trim()}
                   >
-                    {creatingProject ? "Creating..." : "Create Project"}
+                    {creatingProject ? (
+                      <>
+                        <span className="spinner-small"></span>
+                        Creating...
+                      </>
+                    ) : (
+                      "Create Project"
+                    )}
                   </button>
                 </div>
               </form>

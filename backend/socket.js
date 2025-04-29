@@ -1,333 +1,411 @@
-const { protect } = require("./middleware/auth.middleware");
-const Project = require("./models/Project");
-const User = require("./models/User");
+const socketIo = require("socket.io");
 const jwt = require("jsonwebtoken");
+const User = require("./models/User");
+const Project = require("./models/Project");
+const File = require("./models/File");
+const FileContent = require("./models/FileContent");
+const judge0Service = require("./services/judge0Service");
+const { protect } = require("./middleware/auth.middleware");
 
-// Add structured logging
-const logger = {
-  info: (message) => console.log(`[Socket] ${message}`),
-  error: (message, error) => console.error(`[Socket ERROR] ${message}`, error),
-};
+let io;
 
-// Define these at module level to prevent undefined errors
-const fileUpdateDebounceTimers = {};
-const cursorThrottleTimers = {};
+const initializeSocket = (server) => {
+  io = socketIo(server, {
+    cors: {
+      origin: process.env.CLIENT_URL || "http://localhost:3000",
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
+  });
 
-module.exports = (io) => {
-  // Enhanced auth middleware with better error handling
+  // Authentication middleware
   io.use(async (socket, next) => {
     try {
-      const token =
-        socket.handshake.auth.token ||
-        socket.handshake.headers.authorization?.split(" ")[1];
+      const token = socket.handshake.auth.token;
 
       if (!token) {
-        logger.error("No authentication token provided");
-        return next(new Error("Authentication token required"));
+        return next(new Error("Authentication error"));
       }
 
-      const secret = process.env.JWT_SECRET || "devcobb-secret-key";
+      // Verify token
+      const decoded = jwt.verify(
+        token,
+        process.env.JWT_SECRET || "devcobb-secret-key"
+      );
 
-      try {
-        const decoded = jwt.verify(token, secret);
+      // Get user from the token
+      const user = await User.findById(decoded.id);
 
-        const user = await User.findById(decoded.id).select("-password").exec();
-
-        if (!user) {
-          logger.error(`User not found: ${decoded.id}`);
-          return next(new Error("User not found"));
-        }
-
-        socket.user = {
-          id: user._id,
-          name: user.name,
-          email: user.email,
-          avatar: user.avatar,
-        };
-
-        logger.info(
-          `Socket authenticated for user: ${user.name} (${user._id})`
-        );
-        next();
-      } catch (jwtError) {
-        logger.error("JWT verification failed:", jwtError);
-        return next(new Error("Invalid authentication token"));
+      if (!user) {
+        return next(new Error("User not found"));
       }
+
+      // Attach user to socket
+      socket.user = {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+      };
+
+      next();
     } catch (err) {
-      logger.error("Socket authentication error:", err);
       return next(new Error("Authentication error"));
     }
   });
 
-  // Track active rooms for cleanup
-  const activeRooms = new Map();
-
+  // Connection handler
   io.on("connection", (socket) => {
-    logger.info(`User connected: ${socket.user.name} (${socket.id})`);
+    console.log(`User connected: ${socket.user.name} (${socket.id})`);
 
-    // Add connection timeout and heartbeat checking
-    socket.heartbeat = true;
-
-    // Handle heartbeat to keep connection alive
-    socket.on("heartbeat", () => {
-      socket.heartbeat = true;
-      socket.emit("heartbeat-ack");
-    });
-
-    // Add reconnection handling
-    socket.on("reconnect", () => {
-      logger.info(`User reconnected: ${socket.user.name} (${socket.id})`);
-    });
-
-    // Project joining event
-    socket.on("project:join", async ({ projectId }) => {
+    // Join project room
+    socket.on("join:project", async ({ projectId }) => {
       try {
-        // Validate projectId
-        if (!projectId) {
-          return socket.emit("error", { message: "Project ID required" });
-        }
-
+        // Check if user has access to project
         const project = await Project.findById(projectId);
+
         if (!project) {
-          return socket.emit("error", { message: "Project not found" });
+          socket.emit("error", { message: "Project not found" });
+          return;
         }
 
-        // Check if user has access to the project
-        const userHasAccess =
-          project.owner.toString() === socket.user.id ||
-          project.collaborators.some((id) => id.toString() === socket.user.id);
+        const isOwner = project.owner.toString() === socket.user.id;
+        const isCollaborator = project.collaborators.some(
+          (collab) => collab.user.toString() === socket.user.id
+        );
 
-        if (!userHasAccess) {
-          return socket.emit("error", {
-            message: "Unauthorized access to project",
+        if (!isOwner && !isCollaborator) {
+          socket.emit("error", {
+            message: "Not authorized to access this project",
           });
+          return;
         }
 
-        // Join the room for this project
-        const roomId = `project:${projectId}`;
-        socket.join(roomId);
+        // Join room
+        socket.join(`project:${projectId}`);
 
-        // Track this socket in the room
-        if (!activeRooms.has(roomId)) {
-          activeRooms.set(roomId, new Set());
-        }
-        activeRooms.get(roomId).add(socket.id);
+        // Generate random color for user cursor
+        const colors = [
+          "#FF5733",
+          "#33FF57",
+          "#3357FF",
+          "#FF33A8",
+          "#33A8FF",
+          "#A833FF",
+          "#FF8333",
+          "#33FFC1",
+        ];
+        const randomColor = colors[Math.floor(Math.random() * colors.length)];
 
-        // Get current users in the room
-        const clients = await io.in(roomId).fetchSockets();
-        const users = clients.map((client) => ({
-          id: client.user.id,
-          name: client.user.name,
-          socketId: client.id,
-          avatar: client.user.avatar,
-        }));
-
-        // Notify everyone about the new user
-        socket.to(roomId).emit("user:joined", {
+        // Add user to collaborators list
+        const collaborator = {
           id: socket.user.id,
           name: socket.user.name,
           socketId: socket.id,
-          avatar: socket.user.avatar,
-        });
+          color: randomColor,
+        };
 
-        // Send the list of connected users to the newly joined user
-        socket.emit("collaborators", users);
+        // Broadcast to room that user joined
+        socket.to(`project:${projectId}`).emit("user:joined", collaborator);
 
-        // Broadcast to all others in the room
-        socket.to(roomId).emit("collaborators", users);
+        // Get all connected users in the room
+        const room = io.sockets.adapter.rooms.get(`project:${projectId}`);
+        const connectedSockets = room ? Array.from(room) : [];
 
-        logger.info(`User ${socket.user.name} joined project ${projectId}`);
+        // Get collaborators info
+        const collaborators = [];
+
+        for (const socketId of connectedSockets) {
+          if (socketId === socket.id) continue;
+
+          const clientSocket = io.sockets.sockets.get(socketId);
+          if (clientSocket && clientSocket.user) {
+            collaborators.push({
+              id: clientSocket.user.id,
+              name: clientSocket.user.name,
+              socketId: socketId,
+              color: clientSocket.color || randomColor,
+            });
+          }
+        }
+
+        // Send collaborators list to the user
+        socket.emit("collaborators", collaborators);
+
+        // Store user color
+        socket.color = randomColor;
+
+        console.log(`User ${socket.user.name} joined project ${projectId}`);
       } catch (err) {
-        logger.error("Error in project:join", err);
-        socket.emit("error", {
-          message: "Failed to join project",
-          details: err.message,
-        });
+        console.error("Error joining project:", err);
+        socket.emit("error", { message: "Error joining project" });
       }
     });
 
-    // File update event
-    socket.on("file:update", ({ projectId, fileId, content, userId }) => {
-      if (!projectId || !fileId) {
-        return socket.emit("error", { message: "Missing required parameters" });
-      }
+    // Leave project room
+    socket.on("leave:project", ({ projectId }) => {
+      socket.leave(`project:${projectId}`);
+      socket
+        .to(`project:${projectId}`)
+        .emit("user:left", { id: socket.user.id });
+      console.log(`User ${socket.user.name} left project ${projectId}`);
+    });
 
-      const roomId = `project:${projectId}`;
-      const updateKey = `${socket.id}:${fileId}`;
-
-      // Debounce rapid updates from the same client to the same file
-      if (fileUpdateDebounceTimers[updateKey]) {
-        clearTimeout(fileUpdateDebounceTimers[updateKey]);
-      }
-
-      fileUpdateDebounceTimers[updateKey] = setTimeout(() => {
-        // Forward the update to all other clients in the room
-        socket.to(roomId).emit("file:updated", {
-          fileId,
-          content,
-          userId: socket.user.id,
-          timestamp: Date.now(),
-        });
-
-        delete fileUpdateDebounceTimers[updateKey];
-      }, 100); // Debounce time in ms
+    // File update
+    socket.on("file:update", ({ projectId, fileId, content }) => {
+      socket.to(`project:${projectId}`).emit("file:update", {
+        fileId,
+        content,
+        userId: socket.user.id,
+      });
     });
 
     // Cursor position update
     socket.on("cursor:update", ({ projectId, fileId, position }) => {
-      if (!projectId || !fileId) return;
+      socket.to(`project:${projectId}`).emit("cursor:update", {
+        userId: socket.user.id,
+        userName: socket.user.name,
+        fileId,
+        position,
+        color: socket.color,
+      });
+    });
 
-      const roomId = `project:${projectId}`;
-      const cursorKey = `${socket.id}:${fileId}`;
+    // File operations
+    socket.on("file:create", ({ projectId, file }) => {
+      socket.to(`project:${projectId}`).emit("file:create", file);
+    });
 
-      // Throttle cursor updates
-      if (cursorThrottleTimers[cursorKey]) return;
+    socket.on("file:delete", ({ projectId, fileId }) => {
+      socket.to(`project:${projectId}`).emit("file:delete", fileId);
+    });
 
-      cursorThrottleTimers[cursorKey] = setTimeout(() => {
-        socket.to(roomId).emit("cursor:updated", {
-          userId: socket.user.id,
-          userName: socket.user.name,
-          fileId,
-          position,
-          timestamp: Date.now(),
+    socket.on("file:rename", ({ projectId, fileId, newName }) => {
+      socket
+        .to(`project:${projectId}`)
+        .emit("file:rename", { fileId, newName });
+    });
+
+    socket.on("file:move", ({ projectId, fileId, newParentId }) => {
+      socket
+        .to(`project:${projectId}`)
+        .emit("file:move", { fileId, newParentId });
+    });
+
+    // Code execution using Judge0
+    socket.on(
+      "execution:run",
+      async ({ projectId, fileId, language, stdin = "" }) => {
+        try {
+          socket.emit("execution:output", {
+            output: `Running ${language} code...`,
+          });
+
+          // Get file content from database
+          let sourceCode = "";
+
+          if (fileId) {
+            const fileContent = await FileContent.findOne({ file: fileId });
+
+            if (!fileContent) {
+              socket.emit("execution:error", {
+                error: "File content not found",
+              });
+              return;
+            }
+
+            sourceCode = fileContent.content;
+          } else {
+            // Use provided code directly
+            sourceCode = language;
+            language = fileId; // In this case, fileId is actually the language
+          }
+
+          // Submit code to Judge0
+          const submission = await judge0Service.submitCode(
+            sourceCode,
+            language,
+            stdin
+          );
+
+          socket.emit("execution:output", {
+            output: `Code submitted for execution. Waiting for results...`,
+          });
+
+          // If using the real Judge0 API
+          if (process.env.JUDGE0_API_KEY) {
+            // Poll for results
+            let result;
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            while (attempts < maxAttempts) {
+              attempts++;
+
+              // Wait a bit before checking
+              await new Promise((resolve) => setTimeout(resolve, 1000));
+
+              result = await judge0Service.getSubmissionResult(
+                submission.token
+              );
+
+              // If processing is complete
+              if (result.status.id >= 3) {
+                break;
+              }
+
+              socket.emit("execution:output", {
+                output: `Status: ${result.status.description}...`,
+              });
+            }
+
+            if (result.stdout) {
+              socket.emit("execution:output", { output: result.stdout });
+            }
+
+            if (result.stderr) {
+              socket.emit("execution:error", { error: result.stderr });
+            }
+
+            if (result.compile_output && result.status.id !== 3) {
+              socket.emit("execution:error", { error: result.compile_output });
+            }
+
+            socket.emit("execution:done", {
+              status: result.status.description,
+              time: result.time,
+              memory: result.memory,
+            });
+          } else {
+            // Use simulated results
+            await new Promise((resolve) => setTimeout(resolve, 1500)); // Simulate processing delay
+
+            const simulatedResult = judge0Service.getSimulatedResult(
+              submission.token,
+              sourceCode
+            );
+
+            if (simulatedResult.stdout) {
+              socket.emit("execution:output", {
+                output: simulatedResult.stdout,
+              });
+            }
+
+            socket.emit("execution:done", {
+              status: simulatedResult.status.description,
+              time: simulatedResult.time,
+              memory: simulatedResult.memory,
+            });
+          }
+        } catch (err) {
+          console.error("Execution error:", err);
+          socket.emit("execution:error", {
+            error: `Error executing code: ${err.message}`,
+          });
+        }
+      }
+    );
+
+    // Manual code execution from terminal
+    socket.on("terminal:execute", async ({ projectId, language, code }) => {
+      try {
+        socket.emit("terminal:output", {
+          output: `Running ${language} code...`,
         });
 
-        delete cursorThrottleTimers[cursorKey];
-      }, 50); // Throttle time in ms
-    });
+        // Submit code to Judge0
+        const submission = await judge0Service.submitCode(code, language);
 
-    // Code execution request
-    socket.on("execution:run", ({ projectId, fileId, language }) => {
-      if (!projectId || !fileId) {
-        return socket.emit("error", { message: "Missing required parameters" });
-      }
+        socket.emit("terminal:output", {
+          output: `Code submitted for execution. Waiting for results...`,
+        });
 
-      simulateCodeExecution(socket, projectId, language);
-    });
+        // If using the real Judge0 API
+        if (process.env.JUDGE0_API_KEY) {
+          // Poll for results
+          let result;
+          let attempts = 0;
+          const maxAttempts = 10;
 
-    // Handle disconnect with proper cleanup
-    socket.on("disconnect", (reason) => {
-      logger.info(
-        `User disconnected: ${socket.user?.name} (${socket.id}), reason: ${reason}`
-      );
+          while (attempts < maxAttempts) {
+            attempts++;
 
-      // Clean up all rooms this socket was in
-      for (const [roomId, socketIds] of activeRooms.entries()) {
-        if (socketIds.has(socket.id)) {
-          socketIds.delete(socket.id);
+            // Wait a bit before checking
+            await new Promise((resolve) => setTimeout(resolve, 1000));
 
-          // If room format is project:ID, notify others in room
-          if (roomId.startsWith("project:")) {
-            const projectId = roomId.split(":")[1];
-            socket.to(roomId).emit("user:left", {
-              id: socket.user.id,
-              name: socket.user.name,
-              reason,
-              timestamp: Date.now(),
+            result = await judge0Service.getSubmissionResult(submission.token);
+
+            // If processing is complete
+            if (result.status.id >= 3) {
+              break;
+            }
+
+            socket.emit("terminal:output", {
+              output: `Status: ${result.status.description}...`,
             });
-
-            // Update collaborators list for others
-            io.in(roomId)
-              .fetchSockets()
-              .then((clients) => {
-                const remainingUsers = clients.map((client) => ({
-                  id: client.user.id,
-                  name: client.user.name,
-                  socketId: client.id,
-                  avatar: client.user.avatar,
-                }));
-
-                io.to(roomId).emit("collaborators", remainingUsers);
-              })
-              .catch((err) => {
-                logger.error(
-                  "Error updating collaborators after disconnect",
-                  err
-                );
-              });
-
-            logger.info(
-              `User ${socket.user?.name} disconnected from project ${projectId}`
-            );
           }
 
-          // Remove empty room from tracking
-          if (socketIds.size === 0) {
-            activeRooms.delete(roomId);
+          if (result.stdout) {
+            socket.emit("terminal:output", { output: result.stdout });
           }
-        }
-      }
 
-      // Clear any timers associated with this socket
-      for (const key in fileUpdateDebounceTimers) {
-        if (key.includes(socket.id)) {
-          clearTimeout(fileUpdateDebounceTimers[key]);
-          delete fileUpdateDebounceTimers[key];
-        }
-      }
+          if (result.stderr) {
+            socket.emit("terminal:error", { error: result.stderr });
+          }
 
-      for (const key in cursorThrottleTimers) {
-        if (key.includes(socket.id)) {
-          clearTimeout(cursorThrottleTimers[key]);
-          delete cursorThrottleTimers[key];
+          if (result.compile_output && result.status.id !== 3) {
+            socket.emit("terminal:error", { error: result.compile_output });
+          }
+
+          socket.emit("terminal:done", {
+            status: result.status.description,
+            time: result.time,
+            memory: result.memory,
+          });
+        } else {
+          // Use simulated results
+          await new Promise((resolve) => setTimeout(resolve, 1500)); // Simulate processing delay
+
+          const simulatedResult = judge0Service.getSimulatedResult(
+            submission.token,
+            code
+          );
+
+          if (simulatedResult.stdout) {
+            socket.emit("terminal:output", { output: simulatedResult.stdout });
+          }
+
+          socket.emit("terminal:done", {
+            status: simulatedResult.status.description,
+            time: simulatedResult.time,
+            memory: simulatedResult.memory,
+          });
         }
+      } catch (err) {
+        console.error("Terminal execution error:", err);
+        socket.emit("terminal:error", {
+          error: `Error executing code: ${err.message}`,
+        });
       }
     });
-  });
 
-  const heartbeatInterval = setInterval(() => {
-    io.sockets.sockets.forEach((socket) => {
-      if (!socket.heartbeat) {
-        logger.info(`Terminating stale socket connection: ${socket.id}`);
-        return socket.disconnect(true);
-      }
-      socket.heartbeat = false;
-      socket.emit("heartbeat");
+    // Disconnect
+    socket.on("disconnect", () => {
+      // Notify all rooms that the user left
+      const rooms = Array.from(socket.rooms);
+
+      rooms.forEach((room) => {
+        if (room.startsWith("project:")) {
+          const projectId = room.split(":")[1];
+          socket.to(room).emit("user:left", { id: socket.user.id });
+          console.log(
+            `User ${socket.user.name} disconnected from project ${projectId}`
+          );
+        }
+      });
+
+      console.log(`User disconnected: ${socket.user.name} (${socket.id})`);
     });
-  }, 30000);
-
-  // Clean up on server shutdown
-  process.on("SIGTERM", () => {
-    clearInterval(heartbeatInterval);
   });
 };
 
-function simulateCodeExecution(socket, projectId, language) {
-  socket.emit("execution:output", { output: `Running ${language} code...` });
-
-  setTimeout(() => {
-    switch (language) {
-      case "javascript":
-        socket.emit("execution:output", {
-          output: 'console.log("Hello, world!");',
-        });
-        setTimeout(() => {
-          socket.emit("execution:output", { output: "Hello, world!" });
-          socket.emit("execution:done");
-        }, 500);
-        break;
-
-      case "python":
-        socket.emit("execution:output", { output: 'print("Hello, world!")' });
-        setTimeout(() => {
-          socket.emit("execution:output", { output: "Hello, world!" });
-          socket.emit("execution:done");
-        }, 500);
-        break;
-
-      case "html":
-        socket.emit("execution:output", {
-          output: "Rendering HTML in preview panel...",
-        });
-        socket.emit("execution:done");
-        break;
-
-      default:
-        socket.emit("execution:output", {
-          output: `Language ${language} execution simulated.`,
-        });
-        socket.emit("execution:output", { output: "Hello, world!" });
-        socket.emit("execution:done");
-    }
-  }, 1000);
-}
+module.exports = initializeSocket;
