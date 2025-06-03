@@ -4,7 +4,7 @@ const projectSchema = mongoose.Schema(
   {
     name: {
       type: String,
-      required: [true, 'Please add a project name'],
+      required: [true, 'Enter a project name'],
     },
     description: {
       type: String,
@@ -36,9 +36,9 @@ const projectSchema = mongoose.Schema(
       type: String,
       default: '',
     },
-    language: {
+    languageUsed: {
       type: String,
-      default: 'javascript',
+      default: '',
     },
     tags: [String],
     likes: {

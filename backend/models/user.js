@@ -7,6 +7,11 @@ const userSchema = mongoose.Schema(
       type: String,
       required: [true, "Please add a name"],
     },
+    username: {
+      type: String,
+      required: [true, "Please add a username"],
+      unique: true,
+    },
     email: {
       type: String,
       required: [true, "Please add an email"],
@@ -77,7 +82,6 @@ const userSchema = mongoose.Schema(
   }
 );
 
-// Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
