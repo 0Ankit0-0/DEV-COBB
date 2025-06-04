@@ -2,7 +2,7 @@ const asyncHandler = require('express-async-handler');
 const OpenAI = require('openai');
 
 const openai = new OpenAI({
-    // apiKey: process.env.OPENAI_API || 'sk - proj - BS4kDNAO6MSfrYZLYZabUwmU9MXpyJER2u9dBm2rzD3yzGYKtWrre2doB9FnNB9cnGtDfmO9tpT3BlbkFJ5Ph_BoL8jFAqux8LKextZ52zB_P1UTya50x9Lm3DcKmScFnZ3SLqzQR7vR7j_ck5pDZAWfmOUA',
+    // apiKey: process.env.OPENAI_API ,
 });
 
 const createSystemPrompt = (task, language, context) => {
