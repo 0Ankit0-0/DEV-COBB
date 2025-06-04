@@ -1,22 +1,20 @@
 const express = require('express');
-const dotenv = require('dotenv');
 const connectDB = require('./config/db');
 const authMiddleware = require('./middleware/authMiddleware');
 
-const fileRouter = require('./routes/fileRouter');
-const userRouter = require('./routes/userRouter');
-const projectRouter = require('./routes/projectRouter');
-const aiRouter = require('./routes/aiRoutes'); 
+const fileRouter = require('./routes/fileRoutes');
+const userRouter = require('./routes/userRoutes');
+const projectRouter = require('./routes/projectRoutes');
+const aiRouter = require('./routes/aiRoutes');
 
-const uploadRouter = require('./routes/uploadRouter');
+const uploadRouter = require('./routes/uploadRoutes');
 const { createServer } = require('http');
 const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path');
 const app = express();
 
-
-dotenv.config();
+require('dotenv').config();
 
 // Connect to MongoDB
 connectDB();

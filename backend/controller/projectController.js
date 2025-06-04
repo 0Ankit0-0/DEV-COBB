@@ -188,7 +188,7 @@ const updateProject = asyncHandler(async (req, res) => {
 });
 
 const deleteProject = asyncHandler(async (req, res) => {
-    const project = await Prohject.findById(req.params.id);
+    const project = await Project.findById(req.params.id);
 
     if (!project) {
         res.status(404);
@@ -344,14 +344,14 @@ const toggleLikeProject = asyncHandler(async (req, res) => {
 
     await project.save();
 
-    req.json({
+    res.json({
         liked: isLiked ? 'Project unliked' : 'Project liked',
         likes: project.likes
     });
 });
 
 const getUserProjects = asyncHandler(async (req, res) => {
-    const userId = req.params
+    const userId = req.params.userId || req.user._id;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;

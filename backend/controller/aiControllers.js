@@ -1,10 +1,9 @@
 const asyncHandler = require('express-async-handler');
-const { Configuration, OpenAIApi } = require('openai');
+const OpenAI = require('openai');
 
-const configuration = new Configuration({
-    apiKey: process.env.OPENAI_API_KEY,
+const openai = new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || 'sk - proj - BS4kDNAO6MSfrYZLYZabUwmU9MXpyJER2u9dBm2rzD3yzGYKtWrre2doB9FnNB9cnGtDfmO9tpT3BlbkFJ5Ph_BoL8jFAqux8LKextZ52zB_P1UTya50x9Lm3DcKmScFnZ3SLqzQR7vR7j_ck5pDZAWfmOUA',
 });
-const openai = new OpenAIApi(configuration);
 
 const createSystemPrompt = (task, language, context) => {
     const prompts = {
@@ -26,7 +25,7 @@ const createSystemPrompt = (task, language, context) => {
 
 const callOpenAI = async (systemPrompt, userPrompt, model = 'gpt-4') => {
     try {
-        const response = await openai.createChatCompletion({
+        const response = await openai.chat.completions.create({
             model,
             messages: [
                 { role: 'system', content: systemPrompt },
@@ -187,6 +186,19 @@ const codeIntegration = asyncHandler(async (req, res) => {
     res.status(200).json({ integratedCode, sourceCode, targetCode, integrationType: context, language, timestamp: new Date() });
 });
 
+const chatWithAI = asyncHandler(async (req, res) => {
+    const { message, language, context } = req.body;
+    if (!message || !language || !context) {
+        return res.status(400).json({ message: 'Message, language, and context are required.' });
+    }
+
+    const systemPrompt = createSystemPrompt('chatWithAI', language, context);
+    const userPrompt = `User: ${message}`;
+    const response = await callOpenAI(systemPrompt, userPrompt);
+
+    res.status(200).json({ response, message, language, context, timestamp: new Date() });
+});
+
 module.exports = {
     codeSuggestion,
     codeCompletion,
@@ -198,5 +210,6 @@ module.exports = {
     codeDocumentation,
     codeOptimization,
     codeAnalysis,
-    codeIntegration
+    codeIntegration,
+    chatWithAI
 };

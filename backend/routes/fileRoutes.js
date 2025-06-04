@@ -9,7 +9,7 @@ const {
     addComment,
     deleteComment,
     searchFiles,
-} = require('../controllers/fileController');
+} = require('../controller/fileController');
 const express = require('express');
 const router = express.Router();
 const { protect, optionalAuth } = require('../middleware/authMiddleware');
@@ -27,6 +27,6 @@ router.post('/:fileId/move', protect, moveFile);
 router.post('/:fileId/comment', protect, addComment);
 router.delete('/:fileId/comment/:commentId', protect, deleteComment);
 
-router.get('/project/:projectId/tree', optionalAuth, searchFiles);
+router.get('/project/:projectId/search', optionalAuth, searchFiles);
 
 module.exports = router;

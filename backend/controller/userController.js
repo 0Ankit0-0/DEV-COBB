@@ -203,7 +203,7 @@ const searchUsers = asyncHandler(async (req, res) => {
 });
 
 const addFriend = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const { userId } = req.params.userId;
   const currentUserId = req.user.id;
 
   if (userId === currentUserId) {
@@ -234,7 +234,7 @@ const addFriend = asyncHandler(async (req, res) => {
 });
 
 const removeFriend = asyncHandler(async (req, res) => {
-  const { userId } = req.params;
+  const { userId } = req.params.userId;
   const currentUserId = req.user.id;
 
   const user = await User.findById(currentUserId);
