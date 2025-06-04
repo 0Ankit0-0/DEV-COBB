@@ -2,7 +2,8 @@ const asyncHandler = require('express-async-handler');
 const OpenAI = require('openai');
 
 const openai = new OpenAI({
-    // apiKey: process.env.OPENAI_API ,
+    // apiKey: process.env.OPENAI_API git push origin main
+,
 });
 
 const createSystemPrompt = (task, language, context) => {
