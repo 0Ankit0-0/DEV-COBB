@@ -2,8 +2,8 @@ import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { Eye, EyeOff } from "lucide-react"
 import toast from "react-hot-toast"
-import { useAuthServices } from "../../../services/authService"
-import "../..Form/auth.css"
+import { useAuth } from "../../../contexts/authContexts"
+import "../auth.css"
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -18,7 +18,7 @@ const Signup = () => {
   const [isLoading, setIsLoading] = useState(false)
   const navigate = useNavigate()
 
-  const { register } = useAuthServices()
+  const { register } = useAuth()
 
   const handleChange = (e) => {
     setFormData((prev) => ({

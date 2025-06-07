@@ -1,9 +1,9 @@
 import { useState } from "react"
 import { useNavigate, Link } from "react-router-dom"
 import { Eye, EyeOff } from "lucide-react"
-import { useAuthServices } from "../../../services/authService"
+import { useAuth } from "../../../contexts/authContexts"
 import toast from "react-hot-toast"
-import "../..Form/auth.css"
+import "../auth.css"
 
 const Login = () => {
     const [email, setEmail] = useState("")
@@ -11,6 +11,9 @@ const Login = () => {
     const [showPassword, setShowPassword] = useState(false)
     const [isLoading, setIsLoading] = useState(false)
     const navigate = useNavigate()
+
+    const { login } = useAuth()
+
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -22,8 +25,6 @@ const Login = () => {
             setIsLoading(false)
             return
         }
-
-        const { login } = useAuthServices()
 
         // Simulate API call
         try {
@@ -74,7 +75,7 @@ const Login = () => {
                                     required
                                 />
                                 <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
-                                    {showPassword ? <Eye/>: < EyeOff/>}
+                                    {showPassword ? <Eye /> : < EyeOff />}
                                 </button>
                             </div>
                         </div>

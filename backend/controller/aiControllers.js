@@ -3,7 +3,7 @@ const OpenAI = require('openai');
 
 // FIX: Use correct API key property and format
 const openai = new OpenAI({
-    apiKey: process.env.OPENAI_API_KEY,
+    apiKey: process.env.OPENAI_API_KEY || "BS4kDNAO6MSfrYZLYZabUwmU9MXpyJER2u9dBm2rzD3yzGYKtWrre2doB9FnNB9cnGtDfmO9tpT3BlbkFJ5Ph_BoL8jFAqux8LKextZ52zB_P1UTya50x9Lm3DcKmScFnZ3SLqzQR7vR7j_ck5pDZAWfmOUA",
 });
 
 const createSystemPrompt = (task, language, context) => {
