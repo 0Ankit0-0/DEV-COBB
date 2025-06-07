@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import api, { setAuthToken } from '../services/api';
+import React, { createContext, useContext, useState, useEffect } from "react";
+import api, { setAuthToken } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -13,7 +13,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const checkUser = async () => {
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem("token");
       if (token) {
         setAuthToken(token);
         try {
@@ -34,10 +34,13 @@ export const AuthProvider = ({ children }) => {
   const login = async (loginInput, password) => {
     setError(null);
     try {
-      const response = await api.post('/users/login', { login: loginInput, password });
+      const response = await api.post("/users/login", {
+        login: loginInput,
+        password,
+      });
       const { token } = response.data;
       setAuthToken(token);
-      localStorage.setItem('token', token);
+      localStorage.setItem("token", token);
       const user = await getCurrentUser();
       setCurrentUser(user);
       setIsAuthenticated(true);
@@ -45,7 +48,7 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       setCurrentUser(null);
       setIsAuthenticated(false);
-      setError(err?.response?.data?.message || 'Login failed');
+      setError(err?.response?.data?.message || "Login failed");
       throw err;
     }
   };
@@ -53,10 +56,15 @@ export const AuthProvider = ({ children }) => {
   const register = async ({ name, username, email, password }) => {
     setError(null);
     try {
-      const response = await api.post('/users/register', { name, username, email, password });
+      const response = await api.post("/users/register", {
+        name,
+        username,
+        email,
+        password,
+      });
       const { token } = response.data;
       setAuthToken(token);
-      localStorage.setItem('token', token);
+      localStorage.setItem("token", token);
       const user = await getCurrentUser();
       setCurrentUser(user);
       setIsAuthenticated(true);
@@ -64,21 +72,21 @@ export const AuthProvider = ({ children }) => {
     } catch (err) {
       setCurrentUser(null);
       setIsAuthenticated(false);
-      setError(err?.response?.data?.message || 'Signup failed');
+      setError(err?.response?.data?.message || "Signup failed");
       throw err;
     }
   };
 
   const logout = () => {
     setAuthToken(null);
-    localStorage.removeItem('token');
+    localStorage.removeItem("token");
     setCurrentUser(null);
     setIsAuthenticated(false);
   };
 
   const getCurrentUser = async () => {
     // Use '/users/me' for clarity and consistency with backend
-    const response = await api.get('/users/me');
+    const response = await api.get("/users/me");
     return response.data;
   };
 
@@ -89,7 +97,10 @@ export const AuthProvider = ({ children }) => {
 
   const changePassword = async (currentPassword, newPassword) => {
     try {
-      const response = await api.put("/users/password", { currentPassword, newPassword });
+      const response = await api.put("/users/password", {
+        currentPassword,
+        newPassword,
+      });
       return response.data;
     } catch (error) {
       console.error("Failed to change password:", error);

@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "../../../contexts/authContext";
-import toast from "react-hot-toast";
-import "../..Form/auth.css";
+import { useAuth } from "../../../contexts/authContexts";
+import { ToastContainer, toast } from "react-toastify";
+import "../auth.css";
 
 const Login = () => {
   const [loginInput, setLoginInput] = useState("");
