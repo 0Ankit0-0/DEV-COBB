@@ -1,9 +1,9 @@
-import { useState } from "react"
-import { useNavigate, Link } from "react-router-dom"
-import { Eye, EyeOff } from "lucide-react"
-import toast from "react-hot-toast"
-import { useAuth } from "../../../contexts/authContexts"
-import "../auth.css"
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { Eye, EyeOff } from "lucide-react";
+import toast from "react-hot-toast";
+import { useAuth } from "../../../contexts/authContexts";
+import "../auth.css";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -12,57 +12,66 @@ const Signup = () => {
     username: "",
     password: "",
     confirmPassword: "",
-  })
-  const [showPassword, setShowPassword] = useState(false)
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
-  const navigate = useNavigate()
+  });
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const { register } = useAuth()
+  const { register, error } = useAuth();
 
   const handleChange = (e) => {
     setFormData((prev) => ({
       ...prev,
       [e.target.name]: e.target.value,
-    }))
-  }
+    }));
+  };
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
+    e.preventDefault();
+    setIsLoading(true);
 
-    // Validation
-    if (!formData.name || !formData.email || !formData.password || !formData.confirmPassword || !formData.username) {
-      toast.error("Please fill in all fields")
-      setIsLoading(false)
-      return
+    if (
+      !formData.name ||
+      !formData.email ||
+      !formData.password ||
+      !formData.confirmPassword ||
+      !formData.username
+    ) {
+      toast.error("Please fill in all fields");
+      setIsLoading(false);
+      return;
     }
 
     if (formData.password !== formData.confirmPassword) {
-      toast.error("Passwords do not match")
-      setIsLoading(false)
-      return
+      toast.error("Passwords do not match");
+      setIsLoading(false);
+      return;
     }
 
     if (formData.password.length < 6) {
-      toast.error("Password must be at least 6 characters long")
-      setIsLoading(false)
-      return
+      toast.error("Password must be at least 6 characters long");
+      setIsLoading(false);
+      return;
     }
 
     try {
-
-      const userData = await register(formData.email, formData.password, formData.name, formData.username)
-      localStorage.setItem("token", userData.token) // Store token if returned
-      toast.success("Account created successfully! Welcome to Dev-COBB.")
-      navigate("/dashboard")
-
+      await register({
+        name: formData.name,
+        username: formData.username,
+        email: formData.email,
+        password: formData.password,
+      });
+      toast.success("Account created successfully! Welcome to Dev-COBB.");
+      navigate("/dashboard");
     } catch (err) {
-      toast.error("Signup failed. Please try again.")
+      toast.error(
+        err?.response?.data?.message || error || "Signup failed. Please try again."
+      );
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="auth-page">
@@ -82,6 +91,19 @@ const Signup = () => {
                 type="text"
                 placeholder="Enter your full name"
                 value={formData.name}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="username">Username</label>
+              <input
+                id="username"
+                name="username"
+                type="text"
+                placeholder="Enter a username"
+                value={formData.username}
                 onChange={handleChange}
                 required
               />
@@ -113,7 +135,7 @@ const Signup = () => {
                   required
                 />
                 <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? <Eye /> : < EyeOff />}
+                  {showPassword ? <Eye /> : <EyeOff />}
                 </button>
               </div>
             </div>
@@ -135,7 +157,7 @@ const Signup = () => {
                   className="password-toggle"
                   onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                 >
-                  {showConfirmPassword ? <Eye /> : < EyeOff />}
+                  {showConfirmPassword ? <Eye /> : <EyeOff />}
                 </button>
               </div>
             </div>
@@ -159,7 +181,7 @@ const Signup = () => {
         </div>
       </div>
     </div>
-  )
-}
+  );
+};
 
-export default Signup
+export default Signup;

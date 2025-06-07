@@ -16,34 +16,26 @@ const protect = asyncHandler(async (req, res, next) => {
 
             // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            console.log('Decoded token:', decoded);
 
             // Get user from the token
             req.user = await User.findById(decoded.id).select('-password');
 
+            if (!req.user) {
+                console.log('User not found for id:', decoded.id);
+                return res.status(401).json({ message: 'Not authorized, user not found' });
+            }
+
             next();
         } catch (error) {
-            res.status(401);
-            throw new Error('Not authorized, token failed');
+            console.error('Token verification failed:', error.message);
+            return res.status(401).json({ message: 'Not authorized, token failed' });
         }
-    }
-
-    if (!token) {
-        res.status(401);
-        throw new Error('Not authorized, no token');
+    } else {
+        return res.status(401).json({ message: 'Not authorized, no token' });
     }
 });
 
-// Middleware to check if user is an admin
-const admin = (req, res, next) => {
-    if (req.user && req.user.isAdmin) {
-        next();
-    } else {
-        res.status(401);
-        throw new Error('Not authorized as an admin');
-    }
-};
-
-// Middleware to allow optional authentication
 const optionalAuth = asyncHandler(async (req, res, next) => {
     let token;
 
@@ -52,22 +44,24 @@ const optionalAuth = asyncHandler(async (req, res, next) => {
         req.headers.authorization.startsWith('Bearer')
     ) {
         try {
-            // Get token from header
             token = req.headers.authorization.split(' ')[1];
-
-            // Verify token
             const decoded = jwt.verify(token, process.env.JWT_SECRET);
+            console.log('Decoded token (optionalAuth):', decoded);
 
-            // Get user from the token
             req.user = await User.findById(decoded.id).select('-password');
+            if (!req.user) {
+                console.log('User not found for id:', decoded.id);
+                req.user = null;
+            }
         } catch (error) {
-            req.user = null; // If token verification fails, set user to null
-            console.error('Token verification failed:', error);
+            console.error('Token verification failed (optionalAuth):', error.message);
+            req.user = null;
         }
+    } else {
+        req.user = null;
     }
 
     next();
 });
 
-
-module.exports = { protect, admin, optionalAuth };
+module.exports = { protect, optionalAuth };
