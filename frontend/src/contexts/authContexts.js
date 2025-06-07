@@ -1,20 +1,19 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import api, { setAuthToken } from "../services/api";
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import api, { setAuthToken } from '../services/api';
 
-/**
- * Auth Context for user authentication and profile state
- */
 const AuthContext = createContext();
+
+export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
   const [currentUser, setCurrentUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [error] = useState(null);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     const checkUser = async () => {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token');
       if (token) {
         setAuthToken(token);
         try {
@@ -23,40 +22,63 @@ export const AuthProvider = ({ children }) => {
           setIsAuthenticated(true);
         } catch (err) {
           setAuthToken(null);
+          setCurrentUser(null);
+          setIsAuthenticated(false);
         }
       }
       setLoading(false);
     };
     checkUser();
-    // eslint-disable-next-line
   }, []);
 
-  // Auth and user-related service functions
-  const login = async (email, password) => {
-    const response = await api.post("/users/login", { email, password });
-    const { token } = response.data;
-    setAuthToken(token);
-    localStorage.setItem("token", token);
-    const user = await getCurrentUser();
-    setCurrentUser(user);
-    setIsAuthenticated(true);
-    return response.data;
+  const login = async (loginInput, password) => {
+    setError(null);
+    try {
+      const response = await api.post('/users/login', { login: loginInput, password });
+      const { token } = response.data;
+      setAuthToken(token);
+      localStorage.setItem('token', token);
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      return response.data;
+    } catch (err) {
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setError(err?.response?.data?.message || 'Login failed');
+      throw err;
+    }
   };
 
-  const register = async (userData) => {
-    const response = await api.post("/users/register", userData);
-    return response.data;
+  const register = async ({ name, username, email, password }) => {
+    setError(null);
+    try {
+      const response = await api.post('/users/register', { name, username, email, password });
+      const { token } = response.data;
+      setAuthToken(token);
+      localStorage.setItem('token', token);
+      const user = await getCurrentUser();
+      setCurrentUser(user);
+      setIsAuthenticated(true);
+      return response.data;
+    } catch (err) {
+      setCurrentUser(null);
+      setIsAuthenticated(false);
+      setError(err?.response?.data?.message || 'Signup failed');
+      throw err;
+    }
   };
 
   const logout = () => {
     setAuthToken(null);
-    localStorage.removeItem("token");
+    localStorage.removeItem('token');
     setCurrentUser(null);
     setIsAuthenticated(false);
   };
 
   const getCurrentUser = async () => {
-    const response = await api.get("/users/me");
+    // Use '/users/me' for clarity and consistency with backend
+    const response = await api.get('/users/me');
     return response.data;
   };
 
@@ -204,5 +226,3 @@ export const AuthProvider = ({ children }) => {
     </AuthContext.Provider>
   );
 };
-
-export const useAuth = () => useContext(AuthContext);

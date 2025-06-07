@@ -280,10 +280,10 @@ const getAllUsers = asyncHandler(async (req, res) => {
 });
 
 const deleteUser = asyncHandler(async (req, res) => {
-  const user = await User.findById(req.params.id);
+  const user = await User.findById(req.user.id); // Use authenticated user's id
 
   if (user) {
-    await User.findByIdAndDelete(req.params.id);
+    await User.findByIdAndDelete(req.user.id);
     res.json({ message: "User removed" });
   } else {
     res.status(404);

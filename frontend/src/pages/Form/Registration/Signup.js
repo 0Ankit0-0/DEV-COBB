@@ -2,8 +2,8 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import toast from "react-hot-toast";
-import { useAuth } from "../../../contexts/authContexts";
-import "../auth.css";
+import { useAuth } from "../../../contexts/authContext";
+import "../..Form/auth.css";
 
 const Signup = () => {
   const [formData, setFormData] = useState({
@@ -102,7 +102,7 @@ const Signup = () => {
                 id="username"
                 name="username"
                 type="text"
-                placeholder="Enter a username"
+                placeholder="Choose a username"
                 value={formData.username}
                 onChange={handleChange}
                 required

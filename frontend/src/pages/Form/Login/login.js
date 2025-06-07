@@ -1,12 +1,12 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
-import { useAuth } from "../../../contexts/authContexts";
+import { useAuth } from "../../../contexts/authContext";
 import toast from "react-hot-toast";
-import "../auth.css";
+import "../..Form/auth.css";
 
 const Login = () => {
-  const [loginInput, setLoginInput] = useState(""); // username or email
+  const [loginInput, setLoginInput] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +47,6 @@ const Login = () => {
             <h2>Welcome back</h2>
             <p>Enter your username or email and password to access your account</p>
           </div>
-
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
               <label htmlFor="loginInput">Username or Email</label>
@@ -60,7 +59,6 @@ const Login = () => {
                 required
               />
             </div>
-
             <div className="form-group">
               <label htmlFor="password">Password</label>
               <div className="password-input">
@@ -77,12 +75,10 @@ const Login = () => {
                 </button>
               </div>
             </div>
-
             <button type="submit" className="btn btn-primary btn-full" disabled={isLoading}>
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
-
           <div className="auth-footer">
             <p>
               Don't have an account?{" "}

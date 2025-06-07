@@ -22,9 +22,11 @@ router.route('/login').post(loginUser);
 router.route('/profile').get(protect, getUserProfile);
 
 router.route('/profile/me').put(protect, updateUserProfile);
+
 router.route('/settings').put(protect, updateUserSettings);
 
 router.route('/password').put(protect, changePassword);
+router.route('/me').get(protect, getUserProfile);
 router.route('/:username').get(protect, getUserByUsername);
 
 router.route('/search/:query').get(protect, searchUsers);
