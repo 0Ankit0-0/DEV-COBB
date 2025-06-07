@@ -1,9 +1,9 @@
 const asyncHandler = require('express-async-handler');
 const OpenAI = require('openai');
 
+// FIX: Use correct API key property and format
 const openai = new OpenAI({
-    // apiKey: process.env.OPENAI_API git push origin main
-,
+    apiKey: process.env.OPENAI_API_KEY,
 });
 
 const createSystemPrompt = (task, language, context) => {
@@ -24,6 +24,7 @@ const createSystemPrompt = (task, language, context) => {
     return prompts[task] || `You are an AI assistant. Task: ${task}. Language: ${language}. Context: ${context}`;
 };
 
+// FIX: Correct response property for OpenAI (OpenAI Node SDK v4+)
 const callOpenAI = async (systemPrompt, userPrompt, model = 'gpt-4') => {
     try {
         const response = await openai.chat.completions.create({
@@ -36,7 +37,8 @@ const callOpenAI = async (systemPrompt, userPrompt, model = 'gpt-4') => {
             temperature: 0.7,
         });
 
-        return response.data.choices[0].message.content;
+        // FIX: The response format is response.choices[0].message.content
+        return response.choices[0].message.content;
     } catch (error) {
         console.error('Error calling OpenAI:', error);
         throw new Error('Failed to get response from OpenAI');

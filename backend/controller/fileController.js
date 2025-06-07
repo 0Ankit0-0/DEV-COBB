@@ -4,40 +4,35 @@ const Project = require("../models/project");
 const Path = require("path");
 const path = require("path");
 
-const checkProjectAcess = async (projectId, userId, requiredRole = 'viewer') => {
+// Fix: Consistent spelling
+const checkProjectAccess = async (projectId, userId, requiredRole = 'viewer') => {
     const project = await Project.findById(projectId);
-    if (!project) {
-        throw new Error("Project not found");
-    }
+    if (!project) throw new Error("Project not found");
 
-    if (project.owner.toString() === userId.toString()) {
-        return { project, role: 'owner' };
-    }
+    if (project.owner.toString() === userId.toString()) return { project, role: 'owner' };
 
     const collaborator = project.collaborators.find(
         (collab) => collab.user.toString() === userId.toString()
     );
     if (!collaborator) {
-        if (!project.isPublic) {
-            throw new Error("You do not have access to this project");
-        }
-        return { project, role: 'viewer' || 'public' };
+        if (!project.isPublic) throw new Error("You do not have access to this project");
+        return { project, role: 'viewer' };
     }
 
-    const roleHierachy = {
+    const roleHierarchy = {
         'owner': 3,
         "admin": 2,
         'editor': 1,
         'viewer': 0,
     };
 
-    const userRole = roleHierachy[collaborator.role];
-    const requiredRoleValue = roleHierachy[requiredRole];
+    const userRole = roleHierarchy[collaborator.role];
+    const requiredRoleValue = roleHierarchy[requiredRole];
     if (userRole < requiredRoleValue) {
         throw new Error(`You do not have ${requiredRole} access to this project`);
     }
     return { project, role: collaborator.role };
-}
+};
 
 const getLanguageExtension = (fileName) => {
     const ext = Path.extname(fileName).toLowerCase();
@@ -68,9 +63,8 @@ const getLanguageExtension = (fileName) => {
         '.yaml': 'yaml',
         '.txt': 'text',
     };
-
     return languageMap[ext] || 'text';
-}
+};
 
 const createFile = asyncHandler(async (req, res) => {
     const { name, type, content, parentId, projectId, path: filePath } = req.body;
@@ -81,7 +75,7 @@ const createFile = asyncHandler(async (req, res) => {
     }
 
     try {
-        await checkProjectAcess(projectId, req.user._id, 'editor');
+        await checkProjectAccess(projectId, req.user._id, 'editor');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -94,7 +88,7 @@ const createFile = asyncHandler(async (req, res) => {
             res.status(400);
             throw new Error("Parent folder not found or invalid");
         }
-        if (parentFolder.projectId.toString() !== projectId.toString()) {
+        if (parentFolder.project.toString() !== projectId.toString()) {
             res.status(400);
             throw new Error("Parent folder does not belong to the project");
         }
@@ -106,7 +100,7 @@ const createFile = asyncHandler(async (req, res) => {
         fullPath = parentPath ? `${parentPath}/${name}` : name;
     }
 
-    const existingFile = await File.findOne({ path: fullPath, projectId });
+    const existingFile = await File.findOne({ path: fullPath, project: projectId });
     if (existingFile) {
         res.status(400);
         throw new Error("File with this name already exists in the project");
@@ -121,7 +115,7 @@ const createFile = asyncHandler(async (req, res) => {
         project: projectId,
         creator: req.user.id,
         lastModifiedBy: req.user.id,
-        language: type === "file" ? getLanguageFromExtension(name) : undefined,
+        language: type === "file" ? getLanguageExtension(name) : undefined,
     });
 
     const populatedFile = await File.findById(file._id)
@@ -137,8 +131,7 @@ const getProjectFiles = asyncHandler(async (req, res) => {
     const { parentId } = req.query;
 
     try {
-
-        await checkProjectAcess(projectId, req.user?._id || null, 'viewer');
+        await checkProjectAccess(projectId, req.user?._id || null, 'viewer');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -157,14 +150,13 @@ const getProjectFiles = asyncHandler(async (req, res) => {
         .populate("parent", "name path");
 
     res.status(200).json(files);
-
-})
+});
 
 const getFileTree = asyncHandler(async (req, res) => {
     const { projectId } = req.params;
 
     try {
-        await checkProjectAcess(projectId, req.user?._id || null, 'viewer');
+        await checkProjectAccess(projectId, req.user?._id || null, 'viewer');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -179,20 +171,20 @@ const getFileTree = asyncHandler(async (req, res) => {
         return files
             .filter(file =>
                 (parentId === null && !file.parent) ||
-                (file.parent && file.parent.toString() === parentId.toString())
+                (file.parent && file.parent.toString() === parentId?.toString())
             )
             .map(file => ({
                 ...file.toObject(),
                 children: file.type === "folder" ? buildTree(files, file._id.toString()) : [],
             }));
-    }
+    };
 
     const tree = buildTree(files);
     res.status(200).json(tree);
-})
+});
 
 const getFile = asyncHandler(async (req, res) => {
-    const file = await File.findById(req.params.id)
+    const file = await File.findById(req.params.fileId)
         .populate("creator", "name username avatar")
         .populate("lastModifiedBy", "name username avatar")
         .populate("parent", "name path")
@@ -204,17 +196,17 @@ const getFile = asyncHandler(async (req, res) => {
     }
 
     try {
-        await checkProjectAcess(file.project.toString(), req.user?._id || null, 'viewer');
+        await checkProjectAccess(file.project.toString(), req.user?._id || null, 'viewer');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
     }
 
     res.status(200).json(file);
-})
+});
 
 const updateFile = asyncHandler(async (req, res) => {
-    const file = await File.findById(req.params.id);
+    const file = await File.findById(req.params.fileId);
 
     if (!file) {
         res.status(404);
@@ -222,7 +214,7 @@ const updateFile = asyncHandler(async (req, res) => {
     }
 
     try {
-        await checkProjectAcess(file.project.toString(), req.user?._id || null, 'editor');
+        await checkProjectAccess(file.project.toString(), req.user?._id || null, 'editor');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -249,26 +241,20 @@ const updateFile = asyncHandler(async (req, res) => {
         file.path = newPath;
     }
 
-    if (name) file.name = name;
-
-    if (content !== undefined) {
-        file.content = content;
-    }
-
-    if (isOpen !== undefined) {
-        file.isOpen = isOpen;
-    }
+    if (content !== undefined) file.content = content;
+    if (isOpen !== undefined) file.isOpen = isOpen;
 
     if (language && language !== file.language) {
         file.language = language;
-    }
-    else if (!language && file.type === 'file') {
+    } else if (!language && file.type === 'file') {
         file.language = getLanguageExtension(file.name);
     }
 
     if (name && !file.language) {
         file.language = getLanguageExtension(name);
     }
+
+    file.lastModifiedBy = req.user._id;
 
     const updatedFile = await file.save();
 
@@ -278,10 +264,10 @@ const updateFile = asyncHandler(async (req, res) => {
         .populate("parent", "name path");
 
     res.status(200).json(populatedFile);
-})
+});
 
 const deleteFile = asyncHandler(async (req, res) => {
-    const file = await File.findById(req.params.id);
+    const file = await File.findById(req.params.fileId);
 
     if (!file) {
         res.status(404);
@@ -289,13 +275,13 @@ const deleteFile = asyncHandler(async (req, res) => {
     }
 
     try {
-        await checkProjectAcess(file.project.toString(), req.user?._id || null, 'editor');
+        await checkProjectAccess(file.project.toString(), req.user?._id || null, 'editor');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
     }
 
-    // Check if the file is a folder and has children
+    // If folder, recursively delete children
     if (file.type === 'folder') {
         const deleteChildren = async (folderId) => {
             const children = await File.find({ parent: folderId });
@@ -305,19 +291,18 @@ const deleteFile = asyncHandler(async (req, res) => {
                 }
                 await child.remove();
             }
-        }
-
+        };
         await deleteChildren(file._id);
     }
 
-    await File.findByIdAndDelete(req.params.id);
+    await File.findByIdAndDelete(req.params.fileId);
 
     res.status(200).json({ message: "File deleted successfully" });
-})
+});
 
 const moveFile = asyncHandler(async (req, res) => {
     const { newParentId, newName } = req.body;
-    const file = await File.findById(req.params.id);
+    const file = await File.findById(req.params.fileId);
 
     if (!file) {
         res.status(404);
@@ -325,7 +310,7 @@ const moveFile = asyncHandler(async (req, res) => {
     }
 
     try {
-        await checkProjectAcess(file.project.toString(), req.user?._id || null, 'editor');
+        await checkProjectAccess(file.project.toString(), req.user?._id || null, 'editor');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -347,8 +332,7 @@ const moveFile = asyncHandler(async (req, res) => {
             res.status(400);
             throw new Error("Cannot move file into itself");
         }
-    }
-    else {
+    } else {
         newParent = null; // Move to root
     }
 
@@ -387,8 +371,7 @@ const moveFile = asyncHandler(async (req, res) => {
                     await updateChildrenPaths(child._id, childNewPath);
                 }
             }
-        }
-
+        };
         await updateChildrenPaths(updatedFile._id, updatedFile.path);
     }
 
@@ -398,11 +381,11 @@ const moveFile = asyncHandler(async (req, res) => {
         .populate("parent", "name path");
 
     res.status(200).json(populatedFile);
-})
+});
 
 const addComment = asyncHandler(async (req, res) => {
     const { text, line } = req.body;
-    const file = await File.findById(req.params.id);
+    const file = await File.findById(req.params.fileId);
 
     if (!file) {
         res.status(404);
@@ -410,7 +393,7 @@ const addComment = asyncHandler(async (req, res) => {
     }
 
     try {
-        await checkProjectAcess(file.project.toString(), req.user?._id || null, 'editor');
+        await checkProjectAccess(file.project.toString(), req.user?._id || null, 'editor');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -440,18 +423,18 @@ const addComment = asyncHandler(async (req, res) => {
         .populate("comments.user", "name username avatar");
 
     res.status(201).json(populatedFile);
-})
+});
 
 const deleteComment = asyncHandler(async (req, res) => {
     const { commentId } = req.params;
-    const file = await File.findById(req.params.id);
+    const file = await File.findById(req.params.fileId);
     if (!file) {
         res.status(404);
         throw new Error("File not found");
     }
 
     try {
-        await checkProjectAcess(file.project.toString(), req.user?._id || null, 'editor');
+        await checkProjectAccess(file.project.toString(), req.user?._id || null, 'editor');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -463,27 +446,18 @@ const deleteComment = asyncHandler(async (req, res) => {
         throw new Error("Comment not found");
     }
 
-    const { role } = await checkProjectAcess(file.project.toString(), req.user._id, 'editor');
-    if (role !== 'editor' && role !== 'admin' && role !== 'owner') {
-        res.status(403);
-        throw new Error("You do not have permission to delete this comment");
-    }
-
     file.comments.pull(commentId);
     await file.save();
 
-    res.json({
-        message: "Comment deleted successfully"
-    })
-})
+    res.json({ message: "Comment deleted successfully" });
+});
 
 const searchFiles = asyncHandler(async (req, res) => {
     const { projectId } = req.params;
     const { query, type, language } = req.query;
 
     try {
-
-        await checkProjectAcess(projectId, req.user?._id || null, 'viewer');
+        await checkProjectAccess(projectId, req.user?._id || null, 'viewer');
     } catch (error) {
         res.status(403);
         throw new Error(error.message);
@@ -498,13 +472,8 @@ const searchFiles = asyncHandler(async (req, res) => {
         ];
     }
 
-    if (type) {
-        searchQuery.type = type;
-    }
-
-    if (language) {
-        searchQuery.language = language;
-    }
+    if (type) searchQuery.type = type;
+    if (language) searchQuery.language = language;
 
     const files = await File.find(searchQuery)
         .populate("creator", "name username avatar")
@@ -513,7 +482,7 @@ const searchFiles = asyncHandler(async (req, res) => {
         .limit(100);
 
     res.status(200).json(files);
-})
+});
 
 module.exports = {
     createFile,

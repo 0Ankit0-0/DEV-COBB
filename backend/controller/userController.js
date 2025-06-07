@@ -188,7 +188,7 @@ const getUserByUsername = asyncHandler(async (req, res) => {
 
 const searchUsers = asyncHandler(async (req, res) => {
   const query = req.params.query;
-  
+
   const users = await User.find({
     $or: [
       { name: { $regex: query, $options: "i" } },

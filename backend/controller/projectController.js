@@ -18,7 +18,7 @@ const createProject = asyncHandler(async (req, res) => {
         throw new Error('Project name and description are required');
     }
 
-    const project = new Project({
+    const project = await Project.create({
         name,
         description,
         isPublic: isPublic || false,
@@ -66,8 +66,8 @@ const getProjects = asyncHandler(async (req, res) => {
         query.$or = [
             { isPublic: true },
             { owner: req.user._id },
-            { "collaborators.user": req.user.id },
-        ]
+            { "collaborators.user": req.user._id },
+        ];
     } else {
         query.isPublic = true;
     }
@@ -104,7 +104,7 @@ const getProjects = asyncHandler(async (req, res) => {
         totalPages: Math.ceil(totalProjects / limit),
         currentPage: page
     });
-})
+});
 
 const getProject = asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id)
@@ -117,28 +117,22 @@ const getProject = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    if (!project.isPublic && !project.owner.equals(req.user._id) && !project.collaborators.some(collab => collab.user.equals(req.user._id))) {
+    if (!project.isPublic && project.owner.toString() !== req.user._id.toString() &&
+        !project.collaborators.some(collab => collab.user.toString() === req.user._id.toString())
+    ) {
         res.status(403);
         throw new Error('You do not have permission to view this project');
     }
 
-    const hasAcess =
-        project.owner.toString() === req.user._id.toString() ||
-        project.collaborators.some(
-            (collab) => collab.user.toString() === req.user._id
-        )
-
-    if (!hasAcess) {
-        res.status(403);
-        throw new Error('You do not have access to this project');
+    // Increment analytics
+    if (project.analytics && project.analytics.views !== undefined) {
+        project.analytics.views += 1;
+        project.analytics.lastOpened = new Date();
+        await project.save();
     }
 
-    project.analytics.$inc.views += 1;
-    project.analytics.lastOpened = new Date();
-    await project.save();
-
     res.json(project);
-})
+});
 
 const updateProject = asyncHandler(async (req, res) => {
     const project = await Project.findById(req.params.id);
@@ -148,9 +142,9 @@ const updateProject = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    const isOwner = project.owner.toString() === req.user._id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const isCollaborator = project.collaborators.some(
-        (collab) => collab.user.toString() === req.user._id && collab.role === 'editor' || collab.role === 'admin'
+        (collab) => collab.user.toString() === req.user._id.toString() && (collab.role === 'editor' || collab.role === 'admin')
     );
 
     if (!isOwner && !isCollaborator) {
@@ -168,23 +162,21 @@ const updateProject = asyncHandler(async (req, res) => {
         languageUsed
     } = req.body;
 
-    const updatedProject = await Project.findByIdAndUpdate(
-        req.params.id,
-        {
-            name,
-            description,
-            isPublic: isPublic || false,
-            tags: tags || [],
-            template: template || null,
-            languageUsed: languageUsed || null,
-            thumbnail: thumbnail || null
-        },
-        { new: true }
-    )
+    project.name = name || project.name;
+    project.description = description || project.description;
+    project.isPublic = typeof isPublic === "boolean" ? isPublic : project.isPublic;
+    project.tags = tags || project.tags;
+    project.template = template || project.template;
+    project.languageUsed = languageUsed || project.languageUsed;
+    project.thumbnail = thumbnail || project.thumbnail;
+
+    const updatedProject = await project.save();
+
+    const populatedProject = await Project.findById(updatedProject._id)
         .populate('owner', 'name username avatar')
         .populate('collaborators.user', 'name username avatar');
 
-    res.json(updatedProject);
+    res.json(populatedProject);
 });
 
 const deleteProject = asyncHandler(async (req, res) => {
@@ -195,7 +187,7 @@ const deleteProject = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    if (project.owner.toString() !== req.user._id) {
+    if (project.owner.toString() !== req.user._id.toString()) {
         res.status(403);
         throw new Error('You do not have permission to delete this project');
     }
@@ -214,9 +206,9 @@ const addCollaborator = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    const isOwner = project.owner.toString() === req.user._id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const isCollaborator = project.collaborators.some(
-        (collab) => collab.user.toString() === req.user._id && collab.role === 'admin'
+        (collab) => collab.user.toString() === req.user._id.toString() && collab.role === 'admin'
     );
 
     if (!isOwner && !isCollaborator) {
@@ -233,7 +225,6 @@ const addCollaborator = asyncHandler(async (req, res) => {
     const existingCollaborator = project.collaborators.find(
         (collab) => collab.user.toString() === userId
     );
-
     if (existingCollaborator) {
         res.status(400);
         throw new Error('User is already a collaborator on this project');
@@ -246,15 +237,15 @@ const addCollaborator = asyncHandler(async (req, res) => {
 
     await project.save();
 
-    const updateProject = await Project.findById(req.params.id)
+    const updatedProject = await Project.findById(req.params.id)
         .populate('owner', 'name username avatar')
         .populate('collaborators.user', 'name username avatar');
 
-    res.json(updateProject);
+    res.json(updatedProject);
 });
 
 const removeCollaborator = asyncHandler(async (req, res) => {
-    const { userId } = req.body;
+    const { collaboratorId } = req.params;
     const project = await Project.findById(req.params.id);
 
     if (!project) {
@@ -262,9 +253,9 @@ const removeCollaborator = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    const isOwner = project.owner.toString() === req.user._id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const isCollaborator = project.collaborators.some(
-        (collab) => collab.user.toString() === req.user._id && collab.role === 'admin'
+        (collab) => collab.user.toString() === req.user._id.toString() && collab.role === 'admin'
     );
 
     if (!isOwner && !isCollaborator) {
@@ -273,7 +264,7 @@ const removeCollaborator = asyncHandler(async (req, res) => {
     }
 
     project.collaborators = project.collaborators.filter(
-        (collab) => collab.user.toString() !== userId
+        (collab) => collab.user.toString() !== collaboratorId
     );
 
     await project.save();
@@ -286,7 +277,7 @@ const removeCollaborator = asyncHandler(async (req, res) => {
 });
 
 const updateCollaboratorRole = asyncHandler(async (req, res) => {
-    const { userId } = req.params;
+    const { collaboratorId } = req.params;
     const { role } = req.body;
     const project = await Project.findById(req.params.id);
 
@@ -295,9 +286,9 @@ const updateCollaboratorRole = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    const isOwner = project.owner.toString() === req.user._id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const isCollaborator = project.collaborators.some(
-        (collab) => collab.user.toString() === req.user._id && collab.role === 'admin'
+        (collab) => collab.user.toString() === req.user._id.toString() && collab.role === 'admin'
     );
     if (!isOwner && !isCollaborator) {
         res.status(403);
@@ -305,7 +296,7 @@ const updateCollaboratorRole = asyncHandler(async (req, res) => {
     }
 
     const collaborator = project.collaborators.find(
-        (collab) => collab.user.toString() === userId
+        (collab) => collab.user.toString() === collaboratorId
     );
     if (!collaborator) {
         res.status(404);
@@ -330,16 +321,16 @@ const toggleLikeProject = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    const isLiked = project.likedBy.includes(req.user._id);
+    const isLiked = project.likedBy && project.likedBy.includes(req.user._id);
 
     if (isLiked) {
         project.likedBy = project.likedBy.filter(
             userId => userId.toString() !== req.user._id.toString()
         );
-        project.likes -= 1;
+        project.likes = (project.likes || 1) - 1;
     } else {
         project.likedBy.push(req.user._id);
-        project.likes += 1;
+        project.likes = (project.likes || 0) + 1;
     }
 
     await project.save();
@@ -356,7 +347,7 @@ const getUserProjects = asyncHandler(async (req, res) => {
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
 
-    const user = await User.findById(userId)
+    const user = await User.findById(userId);
 
     if (!user) {
         res.status(404);
@@ -364,8 +355,7 @@ const getUserProjects = asyncHandler(async (req, res) => {
     }
 
     let query = { owner: userId };
-
-    if (!req.user || req.user._id.toString() !== userId) {
+    if (!req.user || req.user._id.toString() !== userId.toString()) {
         query.isPublic = true;
     }
 
@@ -393,9 +383,9 @@ const getProjectAnalytics = asyncHandler(async (req, res) => {
         throw new Error('Project not found');
     }
 
-    const isOwner = project.owner.toString() === req.user._id;
+    const isOwner = project.owner.toString() === req.user._id.toString();
     const isCollaborator = project.collaborators.some(
-        (collab) => collab.user.toString() === req.user._id && collab.role === 'admin'
+        (collab) => collab.user.toString() === req.user._id.toString() && collab.role === 'admin'
     );
 
     if (!isOwner && !isCollaborator) {
@@ -406,7 +396,7 @@ const getProjectAnalytics = asyncHandler(async (req, res) => {
     res.json({
         analytics: project.analytics,
         likes: project.likes,
-        views: project.analytics.views,
+        views: project.analytics ? project.analytics.views : 0,
         collaborators: project.collaborators.map(collab => ({
             user: collab.user,
             role: collab.role
@@ -425,9 +415,9 @@ const forkProject = asyncHandler(async (req, res) => {
 
     if (!originalProject.isPublic) {
         const hasAcess =
-            originalProject.owner.toString() === req.user._id ||
+            originalProject.owner.toString() === req.user._id.toString() ||
             originalProject.collaborators.some(
-                (collab) => collab.user.toString() === req.user._id
+                (collab) => collab.user.toString() === req.user._id.toString()
             );
 
         if (!hasAcess) {
@@ -436,7 +426,7 @@ const forkProject = asyncHandler(async (req, res) => {
         }
     }
 
-    const forkedProject = new Project({
+    const forkedProject = await Project.create({
         name: `${originalProject.name} (Forked)`,
         description: originalProject.description,
         isPublic: false,
@@ -458,9 +448,9 @@ const forkProject = asyncHandler(async (req, res) => {
     });
 
     const populatedProject = await Project.findById(forkedProject._id)
-        .populate('owner', 'name username avatar')
+        .populate('owner', 'name username avatar');
 
-    res
+    res.status(201).json(populatedProject);
 });
 
 module.exports = {

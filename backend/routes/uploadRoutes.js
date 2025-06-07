@@ -9,50 +9,57 @@ const { protect } = require("../middleware/authMiddleware");
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     const uploadDir = "uploads/avatars";
-    // Create directory if it doesn't exist
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // Use userId-timestamp-originalname to ensure unique filename
+    // Use userId-timestamp-originalname
     cb(null, `${req.user._id}-${Date.now()}${path.extname(file.originalname)}`);
   },
 });
 
-// Check file type
+// Stronger file type check
 const fileFilter = (req, file, cb) => {
-  const filetypes = /jpeg|jpg|png|gif/;
-  const extname = filetypes.test(path.extname(file.originalname).toLowerCase());
-  const mimetype = filetypes.test(file.mimetype);
-
-  if (extname && mimetype) {
-    return cb(null, true);
+  const allowedExts = ['.jpeg', '.jpg', '.png', '.gif'];
+  const ext = path.extname(file.originalname).toLowerCase();
+  const allowedMimes = [
+    "image/jpeg",
+    "image/png",
+    "image/gif",
+    "image/jpg"
+  ];
+  if (allowedExts.includes(ext) && allowedMimes.includes(file.mimetype)) {
+    cb(null, true);
   } else {
-    cb(new Error("Images only!"), false);
+    cb(new Error("Images only! (jpeg, jpg, png, gif)"), false);
   }
 };
 
-// Initialize upload with configuration
 const upload = multer({
   storage,
   fileFilter,
-  limits: { fileSize: 1024 * 1024 * 5 }, // 5MB file size limit
+  limits: { fileSize: 1024 * 1024 * 5 }, // 5MB
 });
 
-// Upload avatar image
-router.post("/", protect, upload.single("avatar"), (req, res) => {
-  if (!req.file) {
-    return res.status(400).json({ message: "No file uploaded" });
-  }
-
-  // Create URL for the uploaded file
-  const fileUrl = `/${req.file.path.replace(/\\/g, "/")}`;
-
-  res.status(200).json({
-    message: "File uploaded successfully",
-    fileUrl,
+// Avatar upload endpoint
+router.post("/", protect, (req, res, next) => {
+  upload.single("avatar")(req, res, function (err) {
+    if (err instanceof multer.MulterError) {
+      return res.status(400).json({ message: err.message });
+    } else if (err) {
+      return res.status(400).json({ message: err.message });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: "No file uploaded" });
+    }
+    // Build URL for avatar (absolute or relative as needed)
+    const fileUrl = `/uploads/avatars/${req.file.filename}`;
+    res.status(200).json({
+      message: "File uploaded successfully",
+      fileUrl,
+    });
   });
 });
 
