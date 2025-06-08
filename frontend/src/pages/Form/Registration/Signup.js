@@ -66,7 +66,9 @@ const Signup = () => {
       navigate("/dashboard");
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || error || "Signup failed. Please try again."
+        err?.response?.data?.message ||
+        error ||
+        "Signup failed. Please try again."
       );
     } finally {
       setIsLoading(false);
@@ -134,7 +136,11 @@ const Signup = () => {
                   onChange={handleChange}
                   required
                 />
-                <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
                   {showPassword ? <Eye /> : <EyeOff />}
                 </button>
               </div>
@@ -162,7 +168,11 @@ const Signup = () => {
               </div>
             </div>
 
-            <button type="submit" className="btn btn-primary btn-full" disabled={isLoading}>
+            <button
+              type="submit"
+              className="btn btn-primary btn-full"
+              disabled={isLoading}
+            >
               {isLoading ? "Creating account..." : "Create Account"}
             </button>
           </form>

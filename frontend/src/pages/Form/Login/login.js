@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import { useAuth } from "../../../contexts/authContexts";
-import { ToastContainer, toast } from "react-toastify";
+import toast from "react-hot-toast";
 import "../auth.css";
 
 const Login = () => {
@@ -32,7 +32,9 @@ const Login = () => {
       navigate("/dashboard");
     } catch (err) {
       toast.error(
-        err?.response?.data?.message || error || "Login failed. Please try again."
+        err?.response?.data?.message ||
+        error ||
+        "Login failed. Please try again."
       );
     } finally {
       setIsLoading(false);
@@ -45,7 +47,9 @@ const Login = () => {
         <div className="auth-card">
           <div className="auth-header">
             <h2>Welcome back</h2>
-            <p>Enter your username or email and password to access your account</p>
+            <p>
+              Enter your username or email and password to access your account
+            </p>
           </div>
           <form onSubmit={handleSubmit} className="auth-form">
             <div className="form-group">
@@ -70,12 +74,20 @@ const Login = () => {
                   onChange={(e) => setPassword(e.target.value)}
                   required
                 />
-                <button type="button" className="password-toggle" onClick={() => setShowPassword(!showPassword)}>
+                <button
+                  type="button"
+                  className="password-toggle"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
                   {showPassword ? <Eye /> : <EyeOff />}
                 </button>
               </div>
             </div>
-            <button type="submit" className="btn btn-primary btn-full" disabled={isLoading}>
+            <button
+              type="submit"
+              className="btn btn-primary btn-full"
+              disabled={isLoading}
+            >
               {isLoading ? "Signing in..." : "Sign In"}
             </button>
           </form>
