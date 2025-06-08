@@ -66,9 +66,66 @@ export const deleteProject = async (projectId) => {
     }
 };
 
-/**
- * (Optional) Project Context to manage project selection/state in UI
- */
+export const addCollaborator = async (projectId, userId) => {
+    try {
+        const response = await api.post(`/projects/${projectId}/collaborators`, { userId });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to add collaborator:", error);
+        throw error;
+    }
+};
+
+export const removeCollaborator = async (projectId, userId) => {
+    try {
+        const response = await api.delete(`/projects/${projectId}/collaborators/${userId}`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to remove collaborator:", error);
+        throw error;
+    }
+};
+
+export const getProjectAnalytics = async (projectId) => {
+    try {
+        const response = await api.get(`/projects/${projectId}/analytics`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch project analytics:", error);
+        throw error;
+    }
+}
+
+export const forkProject = async (projectId) => {
+    try {
+        const response = await api.post(`/projects/${projectId}/fork`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fork project:", error);
+        throw error;
+    }
+};
+
+export const toggleLikeProject = async (projectId) => {
+    try {
+        const response = await api.post(`/projects/${projectId}/like`);
+        return response.data;
+    } catch (error) {
+        console.error("Failed to like project:", error);
+        throw error;
+    }
+};
+
+export const updateCollaboratorRole = async (projectId, collaboratorId, role) => {
+    try {
+        const response = await api.put(`/projects/${projectId}/collaborators/${collaboratorId}/role`, { role });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to update collaborator role:", error);
+        throw error;
+    }
+};
+
 const ProjectContext = createContext();
 
 export const ProjectProvider = ({ children }) => {
