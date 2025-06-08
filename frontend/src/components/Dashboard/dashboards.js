@@ -1,18 +1,60 @@
-import { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../contexts/authContexts";
 import { toast } from "react-toastify";
+import Projectf from "../../pages/Form/Projectf/projectf";
 import {
     FaUserCircle,
     FaPalette,
     FaUserPlus,
     FaEnvelopeOpenText,
+    FaTimes,
+    FaPlus,
 } from "react-icons/fa";
 import "./dashboard.css";
+
+// Mock friends data (replace with actual data fetching in real use)
+const initialFriends = [
+    {
+        id: 1,
+        name: "Alex Johnson",
+        avatar: "https://i.pravatar.cc/60?img=1",
+        bio: "Enthusiastic coder. Loves React & Roblox.",
+        joined: "2024-07-12",
+    },
+    {
+        id: 2,
+        name: "Maya Patel",
+        avatar: "https://i.pravatar.cc/60?img=2",
+        bio: "UI/UX Designer, cat lover.",
+        joined: "2023-12-03",
+    },
+    {
+        id: 3,
+        name: "Tomás Müller",
+        avatar: "https://i.pravatar.cc/60?img=3",
+        bio: "Backend specialist, NodeJS & Python.",
+        joined: "2022-09-21",
+    },
+    {
+        id: 4,
+        name: "Sara Kim",
+        avatar: "https://i.pravatar.cc/60?img=4",
+        bio: "Full-stack dev and gamer.",
+        joined: "2025-03-02",
+    },
+];
 
 const Dashboards = () => {
     const { currentUser, isAuthenticated, logout, loading } = useAuth();
     const navigate = useNavigate();
+    const [friends, setFriends] = useState(initialFriends);
+    const [openProfile, setOpenProfile] = useState(null);
+    const [addingFriend, setAddingFriend] = useState(false);
+    const [friendUsername, setFriendUsername] = useState("");
+    const [addingFriendLoading, setAddingFriendLoading] = useState(false);
+
+    const [showModal, setShowModal] = useState(false); // For Projectf
 
     useEffect(() => {
         if (!loading) {
@@ -35,14 +77,43 @@ const Dashboards = () => {
     };
 
     const handleCreateProject = () => {
-        toast.success("Project creation feature coming soon!");
+        setShowModal(true); // open modal instead of navigating
+    };
+
+    const handleProjectCreated = () => {
+        // Optional: you can add logic here to refetch project list after creation
+        setShowModal(false); // close modal after project created
     };
 
     const handleCategoryClick = (category) => {
         toast.info(`${category} feature coming soon!`);
     };
 
-    // New dashboard options
+    const handleAddFriend = async (e) => {
+        e.preventDefault();
+        if (!friendUsername.trim()) {
+            toast.error("Please enter a username!");
+            return;
+        }
+        setAddingFriendLoading(true);
+        setTimeout(() => {
+            const newFriend = {
+                id: Date.now(),
+                name: friendUsername,
+                avatar:
+                    "https://i.pravatar.cc/60?img=" +
+                    (Math.floor(Math.random() * 70) + 10),
+                bio: "New friend on Dev-Cobb!",
+                joined: new Date().toISOString().slice(0, 10),
+            };
+            setFriends((prev) => [newFriend, ...prev]);
+            setFriendUsername("");
+            setAddingFriend(false);
+            setAddingFriendLoading(false);
+            toast.success(`Friend request sent to ${friendUsername}!`);
+        }, 900);
+    };
+
     const dashboardOptions = [
         {
             label: "Profile",
@@ -123,6 +194,13 @@ const Dashboards = () => {
 
     return (
         <div className="dashboard">
+            {/* Project Modal */}
+            <Projectf
+                isOpen={showModal}
+                onClose={() => setShowModal(false)}
+                onCreated={handleProjectCreated}
+            />
+
             {/* Header */}
             <header className="dashboard-header">
                 <div className="container">
@@ -132,7 +210,7 @@ const Dashboards = () => {
                             <p>Welcome back, {currentUser.name}!</p>
                         </div>
                         <div className="dashboard-options-row">
-                            {dashboardOptions.map((opt, i) => (
+                            {dashboardOptions.map((opt) => (
                                 <button
                                     key={opt.label}
                                     className="dashboard-option-btn"
@@ -164,6 +242,111 @@ const Dashboards = () => {
                             Manage your projects, explore the community, and bring your ideas
                             to life.
                         </p>
+                    </div>
+
+                    {/* Friends List Row */}
+                    <div className="friends-list-row">
+                        <div className="friends-list-row-titlebar">
+                            <h3>Your Friends</h3>
+                            <button
+                                className="friend-avatar-card friend-avatar-add"
+                                title="Add friend"
+                                onClick={() => setAddingFriend(true)}
+                                aria-label="Add friend"
+                            >
+                                <FaPlus size={22} />
+                                <span className="friend-avatar-name">Add</span>
+                            </button>
+                        </div>
+                        <div className="friends-row-scroll">
+                            {friends.map((friend) => (
+                                <div
+                                    className="friend-avatar-card"
+                                    key={friend.id}
+                                    onClick={() => setOpenProfile(friend)}
+                                    tabIndex={0}
+                                    title={friend.name}
+                                >
+                                    <img
+                                        src={friend.avatar}
+                                        alt={friend.name}
+                                        className="friend-avatar-img"
+                                    />
+                                    <span className="friend-avatar-name">{friend.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                        {/* Profile modal */}
+                        {openProfile && (
+                            <div
+                                className="friend-profile-modal"
+                                onClick={() => setOpenProfile(null)}
+                            >
+                                <div
+                                    className="friend-profile-card"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <button
+                                        className="friend-profile-close"
+                                        onClick={() => setOpenProfile(null)}
+                                        aria-label="Close"
+                                    >
+                                        <FaTimes size={18} />
+                                    </button>
+                                    <img
+                                        src={openProfile.avatar}
+                                        alt={openProfile.name}
+                                        className="friend-profile-avatar"
+                                    />
+                                    <h4>{openProfile.name}</h4>
+                                    <p className="friend-profile-bio">{openProfile.bio}</p>
+                                    <span className="friend-profile-joined">
+                                        Joined: {openProfile.joined}
+                                    </span>
+                                </div>
+                            </div>
+                        )}
+                        {/* Add Friend Modal */}
+                        {addingFriend && (
+                            <div
+                                className="friend-profile-modal"
+                                onClick={() => setAddingFriend(false)}
+                            >
+                                <form
+                                    className="friend-profile-card"
+                                    style={{ minWidth: 260, alignItems: "stretch" }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    onSubmit={handleAddFriend}
+                                >
+                                    <button
+                                        className="friend-profile-close"
+                                        onClick={() => setAddingFriend(false)}
+                                        aria-label="Close"
+                                        type="button"
+                                    >
+                                        <FaTimes size={18} />
+                                    </button>
+                                    <h4 style={{ textAlign: "center" }}>Add a Friend</h4>
+                                    <input
+                                        className="add-friend-input"
+                                        type="text"
+                                        placeholder="Enter username"
+                                        value={friendUsername}
+                                        onChange={(e) => setFriendUsername(e.target.value)}
+                                        autoFocus
+                                        disabled={addingFriendLoading}
+                                    />
+                                    <button
+                                        className="btn btn-primary"
+                                        style={{ marginTop: 16 }}
+                                        type="submit"
+                                        disabled={addingFriendLoading}
+                                    >
+                                        {addingFriendLoading ? "Adding..." : "Add Friend"}
+                                    </button>
+                                </form>
+                            </div>
+                        )}
                     </div>
 
                     {/* Quick Actions */}
