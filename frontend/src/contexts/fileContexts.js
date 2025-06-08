@@ -9,9 +9,7 @@ export const uploadFile = async (file) => {
         const formData = new FormData();
         formData.append("file", file);
         const response = await api.post("/files/upload", formData, {
-            headers: {
-                "Content-Type": "multipart/form-data",
-            },
+            headers: { "Content-Type": "multipart/form-data" },
         });
         return response.data;
     } catch (error) {
@@ -30,9 +28,11 @@ export const createFile = async (fileData) => {
     }
 };
 
-export const getProjectFiles = async (projectId) => {
+export const getProjectFiles = async (projectId, parentId = null) => {
     try {
-        const response = await api.get(`/files/project/${projectId}`);
+        const params = {};
+        if (parentId) params.parentId = parentId;
+        const response = await api.get(`/files/project/${projectId}`, { params });
         return response.data;
     } catch (error) {
         console.error("Failed to fetch project files:", error);
@@ -80,9 +80,13 @@ export const deleteFile = async (fileId) => {
     }
 };
 
-export const moveFile = async (fileId, destinationPath) => {
+// FIX: moveFile expects { newParentId, newName }
+export const moveFile = async (fileId, newParentId = null, newName = null) => {
     try {
-        const response = await api.post(`/files/${fileId}/move`, { destinationPath });
+        const body = {};
+        if (newParentId) body.newParentId = newParentId;
+        if (newName) body.newName = newName;
+        const response = await api.post(`/files/${fileId}/move`, body);
         return response.data;
     } catch (error) {
         console.error("Failed to move file:", error);
@@ -90,9 +94,12 @@ export const moveFile = async (fileId, destinationPath) => {
     }
 };
 
-export const addComment = async (fileId, comment) => {
+// FIX: addComment expects { text, line }
+export const addComment = async (fileId, text, line = null) => {
     try {
-        const response = await api.post(`/files/${fileId}/comment`, { comment });
+        const body = { text };
+        if (line !== null) body.line = line;
+        const response = await api.post(`/files/${fileId}/comment`, body);
         return response.data;
     } catch (error) {
         console.error("Failed to add comment:", error);
@@ -110,9 +117,14 @@ export const deleteComment = async (fileId, commentId) => {
     }
 };
 
-export const searchFiles = async (projectId, query) => {
+// FIX: searchFiles expects query param { query, type, language }
+export const searchFiles = async (projectId, { query = '', type = '', language = '' } = {}) => {
     try {
-        const response = await api.get(`/files/project/${projectId}/search`, { params: { q: query } });
+        const params = {};
+        if (query) params.query = query;
+        if (type) params.type = type;
+        if (language) params.language = language;
+        const response = await api.get(`/files/project/${projectId}/search`, { params });
         return response.data;
     } catch (error) {
         console.error("Failed to search files:", error);
@@ -123,7 +135,6 @@ export const searchFiles = async (projectId, query) => {
 /**
  * (Optional) File Context to manage open/active files if needed in UI
  */
-
 const FileContext = createContext();
 
 export const FileProvider = ({ children }) => {

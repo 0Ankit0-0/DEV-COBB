@@ -1,37 +1,37 @@
 import React, { createContext, useContext, useState } from "react";
 import api from "../services/api";
-import {
-    getFileTree,
-    getProjectFiles,
-    getFile,
-    createFile,
-    updateFile,
-    deleteFile,
-    moveFile,
-    addComment,
-    deleteComment,
-    searchFiles
-} from "./fileContext";
+import * as fileHelpers from "./fileContexts";
 
 /**
  * Project Service Functions
  */
+// Accepts params for search, tags, sortBy, etc.
+export const getProjects = async (params = {}) => {
+    try {
+        const response = await api.get("/projects", { params });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch projects:", error);
+        throw error;
+    }
+};
+
+export const getUserProjects = async (userId, params = {}) => {
+    try {
+        const response = await api.get(`/projects/user/${userId}`, { params });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to fetch user projects:", error);
+        throw error;
+    }
+};
+
 export const createProject = async (projectData) => {
     try {
         const response = await api.post("/projects", projectData);
         return response.data;
     } catch (error) {
         console.error("Failed to create project:", error);
-        throw error;
-    }
-};
-
-export const getProjects = async () => {
-    try {
-        const response = await api.get("/projects");
-        return response.data;
-    } catch (error) {
-        console.error("Failed to fetch projects:", error);
         throw error;
     }
 };
@@ -66,9 +66,10 @@ export const deleteProject = async (projectId) => {
     }
 };
 
-export const addCollaborator = async (projectId, userId) => {
+// Add collaborator expects both userId and role
+export const addCollaborator = async (projectId, userId, role = "viewer") => {
     try {
-        const response = await api.post(`/projects/${projectId}/collaborators`, { userId });
+        const response = await api.post(`/projects/${projectId}/collaborators`, { userId, role });
         return response.data;
     } catch (error) {
         console.error("Failed to add collaborator:", error);
@@ -76,12 +77,22 @@ export const addCollaborator = async (projectId, userId) => {
     }
 };
 
-export const removeCollaborator = async (projectId, userId) => {
+export const removeCollaborator = async (projectId, collaboratorId) => {
     try {
-        const response = await api.delete(`/projects/${projectId}/collaborators/${userId}`);
+        const response = await api.delete(`/projects/${projectId}/collaborators/${collaboratorId}`);
         return response.data;
     } catch (error) {
         console.error("Failed to remove collaborator:", error);
+        throw error;
+    }
+};
+
+export const updateCollaboratorRole = async (projectId, collaboratorId, role) => {
+    try {
+        const response = await api.put(`/projects/${projectId}/collaborators/${collaboratorId}/role`, { role });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to update collaborator role:", error);
         throw error;
     }
 };
@@ -94,7 +105,7 @@ export const getProjectAnalytics = async (projectId) => {
         console.error("Failed to fetch project analytics:", error);
         throw error;
     }
-}
+};
 
 export const forkProject = async (projectId) => {
     try {
@@ -116,16 +127,10 @@ export const toggleLikeProject = async (projectId) => {
     }
 };
 
-export const updateCollaboratorRole = async (projectId, collaboratorId, role) => {
-    try {
-        const response = await api.put(`/projects/${projectId}/collaborators/${collaboratorId}/role`, { role });
-        return response.data;
-    } catch (error) {
-        console.error("Failed to update collaborator role:", error);
-        throw error;
-    }
-};
-
+/**
+ * Project Context
+ * Also exposes all file helpers for convenience
+ */
 const ProjectContext = createContext();
 
 export const ProjectProvider = ({ children }) => {
@@ -137,7 +142,22 @@ export const ProjectProvider = ({ children }) => {
             projects,
             setProjects,
             currentProject,
-            setCurrentProject
+            setCurrentProject,
+            // Project functions
+            getProjects,
+            getUserProjects,
+            createProject,
+            getProject,
+            updateProject,
+            deleteProject,
+            addCollaborator,
+            removeCollaborator,
+            updateCollaboratorRole,
+            getProjectAnalytics,
+            forkProject,
+            toggleLikeProject,
+            // File helpers
+            ...fileHelpers
         }}>
             {children}
         </ProjectContext.Provider>
