@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const api = axios.create({
-  baseURL: process.env.REACT_APP_API_URL || "/api",
+  baseURL: "https://refactored-telegram-r4wwx596667jf55q5-5000.app.github.dev/api"|| "localhost:5000/api",
   withCredentials: true,
   timeout: 20000, // 20 seconds timeout
   headers: {
